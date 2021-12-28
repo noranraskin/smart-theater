@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ACS712.h>
+#include "CREDENTIALS.h"
 
 // ACS712 5A  uses 185 mV per A
 // ACS712 20A uses 100 mV per A
@@ -14,15 +15,11 @@
 // Only use pins from the first ADC channel, the second is occupied by WIFI
 ACS712  ACS(34, 5.0, 4095, 185);
 // If current reading is more than that it will say projector is on.
-const int mASwitch = 2000
+const int mASwitch = 2000;
 
-// Replace with your network credentials
-const char* ssid = "ssid";
-const char* password = "password";
-const char* hostname = "Projector";
-const char* req_host = "Canvas";
-const int onSwitch = 32;
-int state = 0;
+const char* HOSTNAME = "Projector";
+const char* CANVAS = "Canvas";
+const int ON_SWITCH_PIN = 32;
 
 // For HTTP request
 String header;
@@ -33,15 +30,15 @@ const long timeoutTime = 2000;
 unsigned long currentTime = millis();
 // Previous time
 unsigned long previousTime = 0;
-
+int state = 0;
 TaskHandle_t sensor;
 
 void setup() {
   Serial.begin(9600);
   ACS.autoMidPoint();
-  WiFi.setHostname(hostname);
-  pinMode(onSwitch, OUTPUT);
-  digitalWrite(onSwitch, LOW);
+  WiFi.setHostname(HOSTNAME);
+  pinMode(ON_SWITCH_PIN, OUTPUT);
+  digitalWrite(ON_SWITCH_PIN, LOW);
   WiFi.begin(ssid, password);
   Serial.print("Connecting to ");
   Serial.print(ssid);
@@ -177,15 +174,15 @@ void sensorloop(void * parameters) {
 
     WiFiClient client;
     for (int i = 0; i < 5; i++) {
-      if (!client.connect(req_host, httpPort)) {
+      if (!client.connect(CANVAS, httpPort)) {
         Serial.println("Connection to ");
-        Serial.print(req_host);
+        Serial.print(CANVAS);
         Serial.println(" failed.");
         continue;
       } else {
         // This will send the request to the server
         client.print(String("PUT ") + request + " HTTP/1.1\r\n" +
-                     "Host: " + req_host + "\r\n" +
+                     "Host: " + CANVAS + "\r\n" +
                      "Connection: close\r\n\r\n");
         break;
       }
@@ -195,9 +192,9 @@ void sensorloop(void * parameters) {
 }
 
 void turnOn() {
-  digitalWrite(onSwitch, HIGH);
+  digitalWrite(ON_SWITCH_PIN, HIGH);
   delay(100);
-  digitalWrite(onSwitch, LOW);
+  digitalWrite(ON_SWITCH_PIN, LOW);
 }
 
 void turnOff() {
