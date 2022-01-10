@@ -146,7 +146,7 @@ void sensorloop(void * parameters) {
   Serial.print("Starting sensor monitoring on core ");
   Serial.println(xPortGetCoreID());
   for (;;) {
-    delay(500);
+    delay(100);
     int s_read = ACS.mA_AC();
     Serial.println(s_read);
     if (s_read < mASwitch) {
@@ -165,7 +165,9 @@ void sensorloop(void * parameters) {
         state = 1;
       }
     }
-    String request = "/?state=";
+    String request = "http://";
+    request += CANVAS;
+    request += "/?state=";
     if (state == 1) {
       request += "down";
     } else {
@@ -173,19 +175,14 @@ void sensorloop(void * parameters) {
     }
 
     WiFiClient client;
+    HTTPClient http;
     for (int i = 0; i < 5; i++) {
-      if (!client.connect(CANVAS, httpPort)) {
-        Serial.println("Connection to ");
-        Serial.print(CANVAS);
-        Serial.println(" failed.");
-        continue;
-      } else {
-        // This will send the request to the server
-        client.print(String("PUT ") + request + " HTTP/1.1\r\n" +
-                     "Host: " + CANVAS + "\r\n" +
-                     "Connection: close\r\n\r\n");
+      http.begin(client, request);
+      int rc = http.POST("");
+      if (rc == 200 || rc == 300) {
         break;
       }
+      delay(500);
     }
     Serial.println("Canvas updated");
   }
