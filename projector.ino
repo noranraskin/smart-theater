@@ -2,6 +2,7 @@
 #include <HTTPClient.h>
 #include <ACS712.h>
 #include "CREDENTIALS.h"
+#include "helpers.h"
 
 // ACS712 5A  uses 185 mV per A
 // ACS712 20A uses 100 mV per A
@@ -126,20 +127,6 @@ void loop() {
     Serial.println("Client disconnected.");
     Serial.println("");
   }
-}
-
-void send200(WiFiClient client) {
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-type:text/html");
-  client.println("Connection: close");
-  client.println();
-}
-
-void send400(WiFiClient client) {
-  client.println("HTTP/1.1 400 Bad Request");
-  client.println("Content-type:text/html");
-  client.println("Connection: close");
-  client.println();
 }
 
 void sensorloop(void * parameters) {

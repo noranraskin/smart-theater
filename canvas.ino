@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include "CREDENTIALS.h"
+#include "helpers.h"
 
 // Change these two numbers to the pins connected to your encoder.
 int encoderA = 12; // Green
