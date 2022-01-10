@@ -2,9 +2,25 @@
 #include <HTTPClient.h>
 #include "CREDENTIALS.h"
 
-const char* hostname = "Canvas";
-const char* req_host = "Beamer";
+// Change these two numbers to the pins connected to your encoder.
+int encoderA = 12; // Green
+int encoderB = 14; // Yellow
+// Change this number to the pin connected to the end stop.
+int endstop = 27;
+// Change these numbers to the pins connected to your relays.
+// VERY IMPORTANT TO NOT GET THESE WRONG
+// RISK OF SHORTING THE POWER SUPPLY
+int relay1 = 5;
+int relay2 = 17;
+int relay3 = 16;
+
+////////////////
+int updated = 0;
+int turns = 0;
 int state = 0;
+
+const char* HOSTNAME = "Canvas";
+const char* PROJECTOR = "Beamer";
 
 // For HTTP request
 String header;
@@ -21,7 +37,13 @@ TaskHandle_t motor;
 
 void setup() {
   Serial.begin(9600);
-  WiFi.setHostname(hostname);
+  attachInterrupt(digitalPinToInterrupt(encoderA), READ_TURN, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(endstop), READ_ENDSWITCH, CHANGE);
+  pinMode(relay1, OUTPUT);
+  pinMode(relay2, OUTPUT);
+  pinMode(relay3, OUTPUT);
+
+  WiFi.setHostname(HOSTNAME);
 
   WiFi.begin(ssid, password);
   Serial.print("Connecting to ");
@@ -79,4 +101,42 @@ void loop(){
     Serial.println("Client disconnected.");
     Serial.println("");
   }
+}
+
+void turn_up() {
+  digitalWrite(relay1, LOW);
+  digitalWrite(relay3, LOW);
+  digitalWrite(relay2, HIGH);
+}
+
+void turn_down() {
+  digitalWrite(relay2, LOW);
+  digitalWrite(relay3, HIGH);
+  digitalWrite(relay1, HIGH);
+}
+
+
+void READ_TURN() {
+  // Interrupt function to read the x2 pulses of the encoder.
+  if (digitalRead(encoderB) == 0) {
+    if (digitalRead(encoderA) == 0) {
+      // A fell, B is low
+      turns--;
+    } else {
+      // A rose, B is high
+      turns++;
+    }
+  } else {
+    if (digitalRead(encoderA) == 0) {
+      turns++;
+    } else {
+      // A rose, B is low
+      turns--;
+    }
+  }
+  updated = 1;
+}
+
+void READ_ENDSWITCH() {
+  
 }
