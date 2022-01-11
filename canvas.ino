@@ -1,5 +1,8 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <Preferences.h>
 #include "CREDENTIALS.h"
 #include "helpers.h"
 
@@ -18,23 +21,30 @@ int relay3 = 16;
 ////////////////
 int updated = 0;
 int turns = 0;
-int state = 0;
+int target = 0;
+int up_target = 0;
+// Modify this to your gear ratio and canvas size
+int down_target = 16000;
+// Tune the following two values to a avoid feedbackloops
+int deadzone_start = 100;
+int deadzone_stop = 20;
+// int counter = 0; // Only for debugging
+enum state {
+  up,
+  down,
+  else_
+};
+state state = else_;
+
+Preferences prefs;
 
 const char* HOSTNAME = "Canvas";
 const char* PROJECTOR = "Beamer";
 
 // For HTTP request
-String header;
-const int httpPort = 80;
-WiFiServer server(httpPort);
-// Define timeout time in milliseconds (example: 2000ms = 2s)
-const long timeoutTime = 2000;
-unsigned long currentTime = millis();
-// Previous time
-unsigned long previousTime = 0;
+AsyncWebServer server(80);
 
-TaskHandle_t wifi;
-TaskHandle_t motor;
+// TaskHandle_t motor;
 
 void setup() {
   Serial.begin(9600);
@@ -53,55 +63,166 @@ void setup() {
     Serial.print(".");
     delay(500);
   }
-  Serial.println("");
+  Serial.println();
   Serial.println("Connected!");
+
+  prefs.begin("app", false);
+
+  server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("state")) {
+      AsyncWebParameter* p = request->getParam("state");
+      if (p->value() == "up") {
+        if (state == up) {
+          request->send(200, "text/plain", "Already up");
+          return;
+        }
+        target = up_target;
+        state = up;
+        request->send(200, "text/plain", "Rolling up!");
+        Serial.println("Rolling up!");
+        return;
+      } else if (p->value() == "down") {
+        if (state == down) {
+          request->send(200, "text/plain", "Already down");
+          return;
+        }
+        target = down_target;
+        state = down;
+        request->send(200, "text/plain", "Rolling down!");
+        Serial.println("Rolling down!");
+        return;
+      } else if (p->value() == "off") {
+        target = turns;
+        stop_motor();
+        request->send(200, "text/plain", "Stopping motor!");
+        Serial.println("Stopping motor!");
+        return;
+      }
+    }
+    bool safety = true;
+    if (request->hasParam("safety")) {
+      AsyncWebParameter* s = request->getParam("safety");
+      String safety_s = s->value();
+      safety_s.toLowerCase();
+      if (safety_s == "false" || safety_s == "disabled") {
+        safety = false;
+      }
+    }
+    if (request->hasParam("go-up")) {
+      AsyncWebParameter* p = request->getParam("go-up");
+      int amount = p->value().toInt();
+      if (safety) {
+        target = max(up_target, target - amount);
+      } else {
+        target -= amount;
+      }
+      state = else_;
+      request->send(200, "text/plain", "Rolling up to " + String(target));
+      Serial.println("Going up to "+ String(turns));
+      return;
+    }
+    if (request->hasParam("go-down")) {
+      AsyncWebParameter* p = request->getParam("go-down");
+      int amount = p->value().toInt();
+      if (safety) {
+        target = min(up_target, target - amount);
+      } else {
+        target += amount;
+      }
+      state = else_;
+      request->send(200, "text/plain", "Rolling down to " + String(target));
+      Serial.println("Rolling down to "+ String(turns));
+      return;
+    }
+  });
+
+  server.on("/set", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("rolled-up-target")) {
+      int old = up_target;
+      AsyncWebParameter* p = request->getParam("rolled-up-target");
+      String value = p->value();
+      value.toLowerCase();
+      if (value == "current") {
+        up_target = turns;
+      } else {
+        int value_int = value.toInt();
+        if (value_int == 0 && value != "0") {
+          request->send(400, "text/plain", "Couldn't parse value");
+          return;
+        }
+        up_target = value_int;
+      }
+      String output = "Setting rolled up target from "+ String(old) +" to "+value;
+      request->send(200, "/text/plain", output);
+      Serial.println(output);
+    }
+    if (request->hasParam("rolled-down-target")) {
+      AsyncWebParameter* p = request->getParam("rolled-down-target");
+      int old =  down_target;
+      String value = p->value();
+      value.toLowerCase();
+      if (value == "current") {
+        down_target = turns;
+      } else {
+        int value_int = value.toInt();
+        if (value_int == 0 && value != "0") {
+          request->send(400, "text/plain", "Couldn't parse value");
+          return;
+        }
+        down_target = value_int;
+      }
+      String output = "Setting rolled down target from "+ String(old) +" to "+value;
+      request->send(200, "/text/plain", output);
+      Serial.println(output);
+    }
+    if (request->hasParam("target")) {
+      AsyncWebParameter* p = request->getParam("target");
+      int old = target;
+      String value = p->value();
+      int val = value.toInt();
+      if (val == 0 && value != "0") {
+        request->send(400, "text/plain", "Couldn't parse value");
+        return;
+      }
+      target = val;
+      String output = "Setting target from "+ String(old) +" to "+value;
+      request->send(200, "/text/plain", output);
+      Serial.println(output);
+    }
+  });
+
+  server.on("/turns", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/plain", String(turns));
+  });
+
+  server.on("/rolled-up-target", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/plain", String(up_target));
+  });
+
+  server.on("/rolled-down-target", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/plain", String(down_target));
+  });
+
+  server.on("/target", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/plain", String(target));
+  });
+
   server.begin();
 }
 
-// void loop() {
-
-// }
-
 void loop(){
-  WiFiClient client = server.available();   // Listen for incoming clients
-
-  if (client) {                             // If a new client connects,
-    currentTime = millis();
-    previousTime = currentTime;
-    Serial.println("New Client.");          // print a message out in the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    while (client.connected() && currentTime - previousTime <= timeoutTime) {  // loop while the client's connected
-      currentTime = millis();
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out the serial monitor
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            // The HTTP response ends with another blank line
-            client.println();
-            // Break out of the while loop
-            break;
-          } else { // if you got a newline, then clear currentLine
-            currentLine = "";
-          }
-        } else if (c != '\r') {  // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }
-      }
-    }
-    // Clear the header variable
-    // Close the connection
-    client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
+  // counter++;
+  if (target - turns > deadzone_start) {
+    turn_down();
+  } else if (turns - target > deadzone_start) {
+    turn_up();
   }
+  if (abs(turns - target) < deadzone_stop) {
+    stop_motor();
+  }
+  // if (counter % 1000) {
+  //   Serial.println(String(turns));
+  // }
 }
 
 void turn_up() {
@@ -114,6 +235,12 @@ void turn_down() {
   digitalWrite(relay2, LOW);
   digitalWrite(relay3, HIGH);
   digitalWrite(relay1, HIGH);
+}
+
+void stop_motor() {
+  digitalWrite(relay1, LOW);
+  digitalWrite(relay2, LOW);
+  digitalWrite(relay3, LOW);
 }
 
 
@@ -139,5 +266,9 @@ void READ_TURN() {
 }
 
 void READ_ENDSWITCH() {
-  
+  if (digitalRead(endstop) == 1) {
+    stop_motor();
+    up_target = turns + 50;
+    state = up;
+  }
 }
