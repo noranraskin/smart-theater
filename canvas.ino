@@ -4,7 +4,6 @@
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
 #include "CREDENTIALS.h"
-#include "helpers.h"
 
 // Change these two numbers to the pins connected to your encoder.
 int encoderA = 12; // Green
@@ -19,7 +18,6 @@ int relay2 = 17;
 int relay3 = 16;
 
 ////////////////
-int updated = 0;
 int turns = 0;
 int target = 0;
 int up_target = 0;
@@ -29,12 +27,12 @@ int down_target = 16000;
 int deadzone_start = 100;
 int deadzone_stop = 20;
 // int counter = 0; // Only for debugging
-enum state {
+enum State {
   up,
   down,
   else_
 };
-state state = else_;
+State state = else_;
 
 Preferences prefs;
 
@@ -66,7 +64,7 @@ void setup() {
   Serial.println();
   Serial.println("Connected!");
 
-  prefs.begin("app", false);
+  readPrefs();
 
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (request->hasParam("state")) {
@@ -78,6 +76,7 @@ void setup() {
         }
         target = up_target;
         state = up;
+        prefs.putInt("state", up);
         request->send(200, "text/plain", "Rolling up!");
         Serial.println("Rolling up!");
         return;
@@ -88,6 +87,7 @@ void setup() {
         }
         target = down_target;
         state = down;
+        prefs.putInt("state", down;)
         request->send(200, "text/plain", "Rolling down!");
         Serial.println("Rolling down!");
         return;
@@ -117,6 +117,7 @@ void setup() {
         target -= amount;
       }
       state = else_;
+      prefs.putInt("state", else_);
       request->send(200, "text/plain", "Rolling up to " + String(target));
       Serial.println("Going up to "+ String(turns));
       return;
@@ -130,6 +131,7 @@ void setup() {
         target += amount;
       }
       state = else_;
+      prefs.putInt("state", else_);
       request->send(200, "text/plain", "Rolling down to " + String(target));
       Serial.println("Rolling down to "+ String(turns));
       return;
@@ -152,6 +154,7 @@ void setup() {
         }
         up_target = value_int;
       }
+      prefs.putInt("up_target", up_target);
       String output = "Setting rolled up target from "+ String(old) +" to "+value;
       request->send(200, "/text/plain", output);
       Serial.println(output);
@@ -171,6 +174,7 @@ void setup() {
         }
         down_target = value_int;
       }
+      prefs.putInt("down_target", down_target);
       String output = "Setting rolled down target from "+ String(old) +" to "+value;
       request->send(200, "/text/plain", output);
       Serial.println(output);
@@ -207,11 +211,26 @@ void setup() {
     request->send(200, "text/plain", String(target));
   });
 
+  server.on("/state", HTTP_GET, [](AsyncWebServerRequest *request){
+    String out;
+    switch (state) {
+    case up:
+      out = "Rolled up";
+      break;
+    case down:
+      out = "Rolled down";
+      break;
+    case else_:
+      out = "Unknown";
+      break;
+    }
+    request->send(200, "text/plain", out);
+  });
+
   server.begin();
 }
 
 void loop(){
-  // counter++;
   if (target - turns > deadzone_start) {
     turn_down();
   } else if (turns - target > deadzone_start) {
@@ -220,9 +239,24 @@ void loop(){
   if (abs(turns - target) < deadzone_stop) {
     stop_motor();
   }
-  // if (counter % 1000) {
-  //   Serial.println(String(turns));
-  // }
+}
+
+void readPrefs() {
+  prefs.begin("app", false);
+  up_target = prefs.getInt("up_target", up_target);
+  down_target = prefs.getInt("down_target", down_target);
+  state = State(prefs.getInt("state", state));
+  if (state == down) {
+    turns = down_target;
+    target = down_target;
+  } else if (state == else_) {
+    turn_up();
+    // rolls the canvas all the way up.
+    // Only necessary if reboot during rollup/down
+    while (state != up) {
+      turns = 0;
+    }
+  }
 }
 
 void turn_up() {
@@ -262,13 +296,15 @@ void READ_TURN() {
       turns--;
     }
   }
-  updated = 1;
 }
 
 void READ_ENDSWITCH() {
+  // Triggers when the canvas is up and the endstop bumps against the ceiling
   if (digitalRead(endstop) == 1) {
     stop_motor();
     up_target = turns + 50;
     state = up;
+    prefs.putInt("state", up);
+    prefs.putInt("up_target", up_target);
   }
 }

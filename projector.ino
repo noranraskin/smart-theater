@@ -1,6 +1,8 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ACS712.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 #include "CREDENTIALS.h"
 #include "helpers.h"
 
