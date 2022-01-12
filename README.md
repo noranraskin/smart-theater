@@ -1,4 +1,4 @@
 # Smart Theater
 
-Making my projector and canvas work with Siri
+Making my projector and (now motorised) canvas work with Siri
 
