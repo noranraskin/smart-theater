@@ -3,7 +3,7 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
-#include "CREDENTIALS.h"
+#include "helpers.h"
 
 // Change these two numbers to the pins connected to your encoder.
 int encoderA = 12; // Green
@@ -39,10 +39,8 @@ Preferences prefs;
 const char* HOSTNAME = "Canvas";
 const char* PROJECTOR = "Beamer";
 
-// For HTTP request
+// For HTTP requests
 AsyncWebServer server(80);
-
-// TaskHandle_t motor;
 
 void setup() {
   Serial.begin(9600);
@@ -52,17 +50,7 @@ void setup() {
   pinMode(relay2, OUTPUT);
   pinMode(relay3, OUTPUT);
 
-  WiFi.setHostname(HOSTNAME);
-
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to ");
-  Serial.print(ssid);
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
-  Serial.println();
-  Serial.println("Connected!");
+  connectToWifi(HOSTNAME);
 
   readPrefs();
 
@@ -87,7 +75,7 @@ void setup() {
         }
         target = down_target;
         state = down;
-        prefs.putInt("state", down;)
+        prefs.putInt("state", down);
         request->send(200, "text/plain", "Rolling down!");
         Serial.println("Rolling down!");
         return;

@@ -1,15 +1,16 @@
 #include <WiFi.h>
+#include "CREDENTIALS.h"
 
-void send200(WiFiClient client) {
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-type:text/html");
-  client.println("Connection: close");
-  client.println();
-}
+void connectToWifi(const char* HOSTNAME) {
+  WiFi.setHostname(HOSTNAME);
 
-void send400(WiFiClient client) {
-  client.println("HTTP/1.1 400 Bad Request");
-  client.println("Content-type:text/html");
-  client.println("Connection: close");
-  client.println();
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to ");
+  Serial.print(ssid);
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println();
+  Serial.println("Connected!");
 }
