@@ -3,15 +3,14 @@
 
 
 #define RELAY 2
-#define MOTOR_UP 0
-#define MOTOR_DOWN 4
-#define HALL 16
-#define ENDSTOP_UP 17
-#define ENDSTOP_DOWN 5
+#define MOTOR_UP 26
+#define MOTOR_DOWN 27
+#define HALL 13
+#define ENDSTOP_UP 32
+#define ENDSTOP_DOWN 33
 
 WebServer server(80);
 hw_timer_t *timer = NULL;
-int counter = 0;
 
 void stop_motor() {
 	analogWrite(MOTOR_UP, 0);
@@ -22,12 +21,15 @@ void move_motor(int forMilSeconds, int speedPercent, int updown) {
 	speedPercent = max(speedPercent, 0);
 	speedPercent = min(speedPercent, 100);
 	int speed = speedPercent * 255 / 100;
-	if (updown) {
+	if (!digitalRead(ENDSTOP_UP) && updown) {
 		analogWrite(MOTOR_UP, speed);
-	} else {
+	} else if (!digitalRead(ENDSTOP_DOWN) && digitalRead(HALL)) {
 		analogWrite(MOTOR_DOWN, speed);
+	} else {
+		return;
 	}
 	if (forMilSeconds > 0) {
+		Serial.println("Set timer.");
 		timerWrite(timer, 0);
 		timerAlarmWrite(timer, forMilSeconds, false);
 		timerAlarmEnable(timer);
@@ -104,10 +106,8 @@ void setup() {
 	pinMode(HALL, INPUT_PULLUP);
 	timer = timerBegin(0, 80000, true);
 	timerAttachInterrupt(timer, stop_motor, true);
-	attachInterrupt(ENDSTOP_UP, stop_motor, RISING); 
-	attachInterrupt(ENDSTOP_DOWN, stop_motor, RISING);
-	attachInterrupt(HALL, stop_motor, FALLING);
 	// Init homespan
+	homeSpan.enableWebLog(20,"pool.ntp.org","CET","logs");
 	homeSpan.setHostNameSuffix("");         // use null string for suffix (rather than the HomeSpan device ID)
 	homeSpan.setPortNum(8000);              // change port number for HomeSpan so we can use port 80 for the Web Server
 	homeSpan.setWifiCallback(setupWeb);
@@ -122,9 +122,4 @@ void loop() {
 	// Poll homespan and webserver
 	homeSpan.poll();
 	server.handleClient();
-	// counter++;
-	// if (counter > 1000) {
-	// 	Serial.printf("Values for sensors ENDSTOP UP: %d, ENDSTOP DOWN: %d, HALL: %d\n", digitalRead(ENDSTOP_UP), digitalRead(ENDSTOP_DOWN), digitalRead(HALL));
-	// 	counter = 0;
-	// }
 }
