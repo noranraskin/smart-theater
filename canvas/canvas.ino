@@ -1,8 +1,9 @@
 #include "HomeSpan.h"
 #include "WebServer.h"
+#include "homespan_devices.h"
 
 
-#define RELAY 2
+#define STEREO_RELAY 12
 #define MOTOR_UP 26
 #define MOTOR_DOWN 27
 #define HALL 13
@@ -17,19 +18,32 @@ void stop_motor() {
 	analogWrite(MOTOR_DOWN, 0);
 }
 
-void move_motor(int forMilSeconds, int speedPercent, int updown) {
+boolean isDown() {
+	return digitalRead(ENDSTOP_DOWN) || !digitalRead(HALL);
+}
+
+boolean isUP() {
+	return digitalRead(ENDSTOP_UP);
+}
+
+void move_motor(int updown) {
+	move_motor_t(0, 100, updown);
+}
+
+void move_motor_t(int forMilSeconds, int speedPercent, int updown) {
 	speedPercent = max(speedPercent, 0);
 	speedPercent = min(speedPercent, 100);
 	int speed = speedPercent * 255 / 100;
 	if (!digitalRead(ENDSTOP_UP) && updown) {
+		analogWrite(MOTOR_DOWN, 0);
 		analogWrite(MOTOR_UP, speed);
 	} else if (!digitalRead(ENDSTOP_DOWN) && digitalRead(HALL)) {
+		analogWrite(MOTOR_UP, 0);
 		analogWrite(MOTOR_DOWN, speed);
 	} else {
 		return;
 	}
 	if (forMilSeconds > 0) {
-		Serial.println("Set timer.");
 		timerWrite(timer, 0);
 		timerAlarmWrite(timer, forMilSeconds, false);
 		timerAlarmEnable(timer);
@@ -57,9 +71,9 @@ void handleRoot() {
 void handleStereo() {
 	if (server.hasArg("command")) {
 		if (server.arg("command") == "On") {
-			digitalWrite(RELAY, HIGH);
+			digitalWrite(STEREO_RELAY, HIGH);
 		} else if (server.arg("command") == "Off") {
-			digitalWrite(RELAY, LOW);
+			digitalWrite(STEREO_RELAY, LOW);
 		}
 		server.send(200, "text/plain", "Stereo turned " + server.arg("command"));
 	} else {
@@ -76,9 +90,9 @@ void handleCanvas() {
 	int speed = server.arg("speed").toInt();
 
 	if (server.hasArg("direction") && server.arg("direction") == "Up") {
-		move_motor(duration, speed, 1);
+		move_motor_t(duration, speed, 1);
 	} else if (server.hasArg("direction") && server.arg("direction") == "Down") {
-		move_motor(duration, speed, 0);
+		move_motor_t(duration, speed, 0);
 	} else {
 		stop_motor();
 	}
@@ -98,7 +112,7 @@ void setupWeb() {
 
 void setup() {
 	Serial.begin(115200);
-	pinMode(RELAY, OUTPUT);
+	pinMode(STEREO_RELAY, OUTPUT);
 	pinMode(MOTOR_UP, OUTPUT);
 	pinMode(MOTOR_DOWN, OUTPUT);
 	pinMode(ENDSTOP_UP, INPUT_PULLDOWN);
@@ -106,6 +120,9 @@ void setup() {
 	pinMode(HALL, INPUT_PULLUP);
 	timer = timerBegin(0, 80000, true);
 	timerAttachInterrupt(timer, stop_motor, true);
+	attachInterrupt(ENDSTOP_UP, stop_motor, RISING);
+	attachInterrupt(ENDSTOP_DOWN, stop_motor, RISING);
+	attachInterrupt(HALL, stop_motor, FALLING);
 	// Init homespan
 	homeSpan.enableWebLog(20,"pool.ntp.org","CET","logs");
 	homeSpan.setHostNameSuffix("");         // use null string for suffix (rather than the HomeSpan device ID)
@@ -114,8 +131,21 @@ void setup() {
 	homeSpan.begin(Category::Bridges, "HomeSpan Stereo");
 
 	new SpanAccessory();  
-    new Service::AccessoryInformation();
-      new Characteristic::Identify();
+		new Service::AccessoryInformation();
+			new Characteristic::Identify();
+	
+	new SpanAccessory();
+		new Service::AccessoryInformation();
+			new Characteristic::Identify();
+			new Characteristic::Name("Canvas");
+		new Canvas(move_motor, isDown, isUP);
+	
+	new SpanAccessory();
+		new Service::AccessoryInformation();
+			new Characteristic::Identify();
+			new Characteristic::Name("Stereo");
+		new Stereo(STEREO_RELAY);
+
 }
 
 void loop() {
