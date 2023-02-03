@@ -1,5 +1,5 @@
 #include "HomeSpan.h"
-#include "WebServer.h"
+#include "ESPAsyncWebSrv.h"
 #include "homespan_devices.h"
 
 
@@ -10,7 +10,7 @@
 #define ENDSTOP_UP 32
 #define ENDSTOP_DOWN 33
 
-WebServer server(80);
+AsyncWebServer server(80);
 hw_timer_t *timer = NULL;
 
 void stop_motor() {
@@ -50,7 +50,7 @@ void move_motor_t(int forMilSeconds, int speedPercent, int updown) {
 	}
 }
 
-void handleRoot() {
+void handleRoot(AsyncWebServerRequest *request) {
 	String html = "<html><body>";
 	html += "<form action='/stereo' method='post'>";
 	html += "Stereo:<br>";
@@ -65,49 +65,49 @@ void handleRoot() {
 	html += "<input type='submit' name='direction' value='Stop'>";
 	html += "</form>";
 	html += "</body></html>";
-	server.send(200, "text/html", html);
+	request->send(200, "text/html", html);
 }
 
-void handleStereo() {
-	if (server.hasArg("command")) {
-		if (server.arg("command") == "On") {
+void handleStereo(AsyncWebServerRequest *request) {
+	if (request->hasArg("command")) {
+		String command = request->arg("command");
+		if (command == "On") {
 			digitalWrite(STEREO_RELAY, HIGH);
-		} else if (server.arg("command") == "Off") {
+		} else if (command == "Off") {
 			digitalWrite(STEREO_RELAY, LOW);
 		}
-		server.send(200, "text/plain", "Stereo turned " + server.arg("command"));
+		request->send(200, "text/plain", "Stereo turned " + request->arg("command"));
 	} else {
-		server.send(400, "text/plain", "Bad  Request");
+		request->send(400, "text/plain", "Bad  Request");
 	}
 }
 
-void handleCanvas() {
-	if (server.hasArg("duration") && server.hasArg("speed")) {
-	if (server.hasArg("direction") && server.arg("direction") == "Stop") {
+void handleCanvas(AsyncWebServerRequest *request) {
+	if (request->hasArg("duration") && request->hasArg("speed")) {
+	if (request->hasArg("direction") && request->arg("direction") == "Stop") {
 		stop_motor();
 	}
-	int duration = server.arg("duration").toInt();
-	int speed = server.arg("speed").toInt();
-
-	if (server.hasArg("direction") && server.arg("direction") == "Up") {
+	float duration = request->arg("duration").toFloat();
+	int speed = request->arg("speed").toInt();
+	if (request->hasArg("direction") && request->arg("direction") == "Up") {
 		move_motor_t(duration, speed, 1);
-	} else if (server.hasArg("direction") && server.arg("direction") == "Down") {
+	} else if (request->hasArg("direction") && request->arg("direction") == "Down") {
 		move_motor_t(duration, speed, 0);
 	} else {
 		stop_motor();
 	}
 
-	server.send(200, "text/plain", "Motor moved");
+	request->send(200, "text/plain", "Motor moved");
 	} else {
-	server.send(400, "text/plain", "Bad Request");
+	request->send(400, "text/plain", "Bad Request");
 	}
 }
 
 void setupWeb() {
-	server.begin();
 	server.on("/", handleRoot);
 	server.on("/stereo", handleStereo);
 	server.on("/canvas", handleCanvas);
+	server.begin();
 }
 
 void setup() {
@@ -151,5 +151,4 @@ void setup() {
 void loop() {
 	// Poll homespan and webserver
 	homeSpan.poll();
-	server.handleClient();
 }
