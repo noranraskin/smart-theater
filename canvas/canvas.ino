@@ -3,7 +3,6 @@
 #include "homespan_devices.h"
 #include "LittleFS.h"
 
-
 #define STEREO_RELAY 12
 #define MOTOR_UP 26
 #define MOTOR_DOWN 27
@@ -31,10 +30,10 @@ void move_motor(int updown) {
 	move_motor_t(0, 100, updown);
 }
 
-void move_motor_t(int forMilSeconds, int speedPercent, int updown) {
+void move_motor_t(float forSeconds, int speedPercent, int updown) {
 	speedPercent = max(speedPercent, 0);
 	speedPercent = min(speedPercent, 100);
-	int speed = speedPercent * 255 / 100;
+	int speed = map(speedPercent, 0, 100, 65, 255);
 	if (!digitalRead(ENDSTOP_UP) && updown) {
 		analogWrite(MOTOR_DOWN, 0);
 		analogWrite(MOTOR_UP, speed);
@@ -44,9 +43,10 @@ void move_motor_t(int forMilSeconds, int speedPercent, int updown) {
 	} else {
 		return;
 	}
-	if (forMilSeconds > 0) {
+	int uSeconds = (int)(forSeconds * 500000);
+	if (uSeconds > 0) {
 		timerWrite(timer, 0);
-		timerAlarmWrite(timer, forMilSeconds, false);
+		timerAlarmWrite(timer, uSeconds, false);
 		timerAlarmEnable(timer);
 	}
 }
@@ -76,29 +76,28 @@ void handleStereo(AsyncWebServerRequest *request) {
 
 void handleCanvas(AsyncWebServerRequest *request) {
 	if (request->hasArg("duration") && request->hasArg("speed")) {
-	if (request->hasArg("direction") && request->arg("direction") == "Stop") {
-		stop_motor();
-	}
-	float duration = request->arg("duration").toFloat();
-	int speed = request->arg("speed").toInt();
-	if (request->hasArg("direction") && request->arg("direction") == "Up") {
-		move_motor_t(duration, speed, 1);
-	} else if (request->hasArg("direction") && request->arg("direction") == "Down") {
-		move_motor_t(duration, speed, 0);
+		if (request->hasArg("direction") && request->arg("direction") == "Stop") {
+			stop_motor();
+		}
+		float duration = request->arg("duration").toFloat();
+		int speed = request->arg("speed").toInt();
+		if (request->hasArg("direction") && request->arg("direction") == "Up") {
+			move_motor_t(duration, speed, 1);
+		} else if (request->hasArg("direction") && request->arg("direction") == "Down") {
+			move_motor_t(duration, speed, 0);
+		} else {
+			stop_motor();
+		}
+		request->send(200, "text/plain", "Motor moved");
 	} else {
-		stop_motor();
-	}
-
-	request->send(200, "text/plain", "Motor moved");
-	} else {
-	request->send(400, "text/plain", "Bad Request");
+		request->send(400, "text/plain", "Bad Request");
 	}
 }
 
 void setupWeb() {
-	server.on("/", handleRoot);
 	server.on("/stereo", handleStereo);
 	server.on("/canvas", handleCanvas);
+	server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 	server.begin();
 }
 
@@ -110,38 +109,37 @@ void setup() {
 	pinMode(ENDSTOP_UP, INPUT_PULLDOWN);
 	pinMode(ENDSTOP_DOWN, INPUT_PULLDOWN);
 	pinMode(HALL, INPUT_PULLUP);
-	timer = timerBegin(0, 80000, true);
+	timer = timerBegin(0, 80, true);
 	timerAttachInterrupt(timer, stop_motor, true);
 	attachInterrupt(ENDSTOP_UP, stop_motor, RISING);
 	attachInterrupt(ENDSTOP_DOWN, stop_motor, RISING);
-	attachInterrupt(HALL, stop_motor, FALLING);	
+	attachInterrupt(HALL, stop_motor, FALLING);
 	// Initialize SPIFFS
-	if(!LittleFS.begin()){
+	if (!LittleFS.begin()) {
 		WEBLOG("An Error has occurred while mounting FS");
 	}
 	// Init homespan
-	homeSpan.enableWebLog(20,"pool.ntp.org","CET","logs");
-	homeSpan.setHostNameSuffix("");         // use null string for suffix (rather than the HomeSpan device ID)
-	homeSpan.setPortNum(8000);              // change port number for HomeSpan so we can use port 80 for the Web Server
+	homeSpan.enableWebLog(20, "pool.ntp.org", "CET", "logs");
+	homeSpan.setHostNameSuffix(""); // use null string for suffix (rather than the HomeSpan device ID)
+	homeSpan.setPortNum(8000);		// change port number for HomeSpan so we can use port 80 for the Web Server
 	homeSpan.setWifiCallback(setupWeb);
 	homeSpan.begin(Category::Bridges, "HomeSpan Stereo");
 
-	new SpanAccessory();  
-		new Service::AccessoryInformation();
-			new Characteristic::Identify();
-	
 	new SpanAccessory();
-		new Service::AccessoryInformation();
-			new Characteristic::Identify();
-			new Characteristic::Name("Canvas");
-		new Canvas(move_motor, isDown, isUP);
-	
-	new SpanAccessory();
-		new Service::AccessoryInformation();
-			new Characteristic::Identify();
-			new Characteristic::Name("Stereo");
-		new Stereo(STEREO_RELAY);
+	new Service::AccessoryInformation();
+	new Characteristic::Identify();
 
+	new SpanAccessory();
+	new Service::AccessoryInformation();
+	new Characteristic::Identify();
+	new Characteristic::Name("Canvas");
+	new Canvas(move_motor, isDown, isUP);
+
+	new SpanAccessory();
+	new Service::AccessoryInformation();
+	new Characteristic::Identify();
+	new Characteristic::Name("Stereo");
+	new Stereo(STEREO_RELAY);
 }
 
 void loop() {
