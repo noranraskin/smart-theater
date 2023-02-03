@@ -103,6 +103,7 @@ void setupWeb() {
 
 void setup() {
 	Serial.begin(115200);
+	setCpuFrequencyMhz(80);
 	pinMode(STEREO_RELAY, OUTPUT);
 	pinMode(MOTOR_UP, OUTPUT);
 	pinMode(MOTOR_DOWN, OUTPUT);
@@ -119,6 +120,7 @@ void setup() {
 		WEBLOG("An Error has occurred while mounting FS");
 	}
 	// Init homespan
+	homeSpan.enableOTA();
 	homeSpan.enableWebLog(20, "pool.ntp.org", "CET", "logs");
 	homeSpan.setHostNameSuffix(""); // use null string for suffix (rather than the HomeSpan device ID)
 	homeSpan.setPortNum(8000);		// change port number for HomeSpan so we can use port 80 for the Web Server
