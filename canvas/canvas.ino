@@ -1,6 +1,7 @@
 #include "HomeSpan.h"
 #include "ESPAsyncWebSrv.h"
 #include "homespan_devices.h"
+#include "LittleFS.h"
 
 
 #define STEREO_RELAY 12
@@ -51,21 +52,12 @@ void move_motor_t(int forMilSeconds, int speedPercent, int updown) {
 }
 
 void handleRoot(AsyncWebServerRequest *request) {
-	String html = "<html><body>";
-	html += "<form action='/stereo' method='post'>";
-	html += "Stereo:<br>";
-	html += "<input type='submit' name='command' value='On'>";
-	html += "<input type='submit' name='command' value='Off'>";
-	html += "</form>";
-	html += "<form action='/canvas' method='post'>";
-	html += "Duration (ms): <input type='number' name='duration' value='1000'><br>";
-	html += "Speed (%): <input type='number' name='speed' value='100'><br>";
-	html += "<input type='submit' name='direction' value='Up'>";
-	html += "<input type='submit' name='direction' value='Down'>";
-	html += "<input type='submit' name='direction' value='Stop'>";
-	html += "</form>";
-	html += "</body></html>";
-	request->send(200, "text/html", html);
+	File website = LittleFS.open("/index.html");
+	if (website) {
+		request->send(200, "text/html", website.readString());
+		return;
+	}
+	request->send(404, "text/html", "404 Not found");
 }
 
 void handleStereo(AsyncWebServerRequest *request) {
@@ -122,7 +114,11 @@ void setup() {
 	timerAttachInterrupt(timer, stop_motor, true);
 	attachInterrupt(ENDSTOP_UP, stop_motor, RISING);
 	attachInterrupt(ENDSTOP_DOWN, stop_motor, RISING);
-	attachInterrupt(HALL, stop_motor, FALLING);
+	attachInterrupt(HALL, stop_motor, FALLING);	
+	// Initialize SPIFFS
+	if(!LittleFS.begin()){
+		WEBLOG("An Error has occurred while mounting FS");
+	}
 	// Init homespan
 	homeSpan.enableWebLog(20,"pool.ntp.org","CET","logs");
 	homeSpan.setHostNameSuffix("");         // use null string for suffix (rather than the HomeSpan device ID)
