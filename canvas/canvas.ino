@@ -9,6 +9,7 @@
 #define HALL 13
 #define ENDSTOP_UP 32
 #define ENDSTOP_DOWN 33
+#define STATUS_LED	25
 
 AsyncWebServer server(80);
 hw_timer_t *timer = NULL;
@@ -64,9 +65,9 @@ void handleStereo(AsyncWebServerRequest *request) {
 	if (request->hasArg("command")) {
 		String command = request->arg("command");
 		if (command == "On") {
-			digitalWrite(STEREO_RELAY, HIGH);
-		} else if (command == "Off") {
 			digitalWrite(STEREO_RELAY, LOW);
+		} else if (command == "Off") {
+			digitalWrite(STEREO_RELAY, HIGH);
 		}
 		request->send(200, "text/plain", "Stereo turned " + request->arg("command"));
 	} else {
@@ -121,6 +122,8 @@ void setup() {
 	}
 	// Init homespan
 	homeSpan.enableOTA();
+	homeSpan.setStatusPin(STATUS_LED);
+	// homeSpan.setControlPin(CONTROL_BUTTON);
 	homeSpan.enableWebLog(20, "pool.ntp.org", "CET", "logs");
 	homeSpan.setHostNameSuffix(""); // use null string for suffix (rather than the HomeSpan device ID)
 	homeSpan.setPortNum(8000);		// change port number for HomeSpan so we can use port 80 for the Web Server
