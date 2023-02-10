@@ -7,17 +7,17 @@ struct Stereo : Service::LightBulb {
     Stereo(int pin) : Service::LightBulb() {
         power = new Characteristic::On(0, true); // Powered off by default, but save state changes to nvm
         powerPin = pin;
-        digitalWrite(powerPin, power->getVal());
+        digitalWrite(powerPin, !power->getVal());
     }
 
     boolean update() {
-        digitalWrite(powerPin, power->getNewVal());
+        digitalWrite(powerPin, !power->getNewVal());
         return true;
     }
 
     void loop() {
-        if (power->getVal() != digitalRead(powerPin)) {
-            power->setVal(digitalRead(powerPin));
+        if (power->getVal() == digitalRead(powerPin)) {
+            power->setVal(!digitalRead(powerPin));
         }
     }
 };
