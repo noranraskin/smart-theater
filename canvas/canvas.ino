@@ -104,7 +104,6 @@ void setupWeb() {
 
 void setup() {
 	Serial.begin(115200);
-	setCpuFrequencyMhz(80);
 	pinMode(STEREO_RELAY, OUTPUT);
 	pinMode(MOTOR_UP, OUTPUT);
 	pinMode(MOTOR_DOWN, OUTPUT);
