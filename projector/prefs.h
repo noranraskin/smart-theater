@@ -13,6 +13,7 @@ struct Settings {
   static const String acs_weight;
   static const String acs_on_atv;
   static const String acs_off_atv;
+  static const String hs_update_interval;
 };
 
 const String Settings::steps = "Stepper: Steps per Revolution";
@@ -20,6 +21,7 @@ const String Settings::speed = "Stepper: Motor Speed";
 const String Settings::acs_weight = "ACS: Low Pass weight";
 const String Settings::acs_on_atv = "ACS: On Threshold Apple TV";
 const String Settings::acs_off_atv = "ACS: Off Threshold Apple TV";
+const String Settings::hs_update_interval = "Homespan: ACS Update Interval";
 
 std::map<String, float> params = {
   {Settings::steps, 200},
@@ -27,6 +29,7 @@ std::map<String, float> params = {
   {Settings::acs_weight, 0.01},
   {Settings::acs_on_atv, 83},
   {Settings::acs_off_atv, 76},
+  {Settings::hs_update_interval, 30},
 };
 
 String hashString(String str) {

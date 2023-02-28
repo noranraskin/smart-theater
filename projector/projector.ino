@@ -5,20 +5,41 @@
 #include "LittleFS.h"
 #include "AsyncJson.h"
 #include "HomeSpan.h"
+#include "homespan_devices.h"
 
-#define IN1 12
-#define IN2 14
-#define IN3 27
-#define IN4 26
+#define STEPPER1 13
+#define STEPPER2 27
+#define STEPPER3 26
+#define STEPPER4 25
+
+// Only use pins from the first ADC channel for ACS sensors, the second is occupied by WIFI
 #define ACS_1 34
+#define ACS_2 35
 
-int c = 0;
-float value  = 0;
+const int ON_SWITCH_PIN = 32;
 
-Stepper motor(params[Settings::steps], IN1, IN2, IN3, IN4);
-ACS712  ACS(34, 5.0, 4095, 185);
+void turnOn() {
+  digitalWrite(ON_SWITCH_PIN, HIGH);
+  delay(100);
+  digitalWrite(ON_SWITCH_PIN, LOW);
+}
+
+void turnOff() {
+  turnOn();
+  delay(300);
+  turnOn();
+}
+
+float mA_value_ATV  = 0;
+float mA_value_PROJECTOR = 0;
+
+Stepper motor(params[Settings::steps], STEPPER1, STEPPER2, STEPPER3, STEPPER4);
+ACS712 ACS_ATV(ACS_1, 5.0, 4095, 185);
+ACS712 ACS_PROJECTOR(ACS_2, 5.0, 4095, 185);
 AsyncWebServer server(80);
 
+AppleTV* appleTV;
+Projector* projector;
 
 void handleSettings(AsyncWebServerRequest *request) {
   String url = request->url();
@@ -64,38 +85,52 @@ void setup() {
   if (!LittleFS.begin()) {
 		WEBLOG("An Error has occurred while mounting FS");
 	}
+  loadSettings();
+  // Setup pins
+  pinMode(ON_SWITCH_PIN, OUTPUT);
+  // Setup homespan
   homeSpan.enableOTA();
   homeSpan.enableWebLog(20, "pool.ntp.org", "CET", "logs");
   homeSpan.setHostNameSuffix(""); // use null string for suffix (rather than the HomeSpan device ID)
 	homeSpan.setPortNum(8000);		// change port number for HomeSpan so we can use port 80 for the Web Server
 	homeSpan.setWifiCallback(setupWeb);
 	homeSpan.begin(Category::Bridges, "HomeSpan Projector");
-  loadSettings();
 
-  ACS.autoMidPoint();
-  ACS.suppressNoise(true);
-  value = ACS.mA_AC();  // get initial value
+  new SpanAccessory();
+  new Service::AccessoryInformation();
+  new Characteristic::Identify();
+
+  new SpanAccessory();
+  new Service::AccessoryInformation();
+  new Characteristic::Identify();
+  new Characteristic::Name("Apple TV Monitor");
+  appleTV = new AppleTV();
+
+  new SpanAccessory();
+  new Service::AccessoryInformation();
+  new Characteristic::Identify();
+  new Characteristic::Name("Projector");
+  projector = new Projector();
+
+  // Setup ACS sensors
+  ACS_ATV.autoMidPoint();
+  ACS_PROJECTOR.autoMidPoint();
+  ACS_ATV.suppressNoise(true);
+  ACS_PROJECTOR.suppressNoise(true);
+  mA_value_ATV = ACS_ATV.mA_AC();  // get initial values
+  mA_value_PROJECTOR = ACS_PROJECTOR.mA_AC();
 }
 
 
 void loop() {
   homeSpan.poll();
-  // //  select sppropriate function
-  // float mA = ACS.mA_AC_sampling();
-  // float weight = params[Settings::acs_weight];
-  // // float mA = ACS.mA_AC();
-  // value += weight * (mA - value);  // low pass filtering
-  // if (c % 10 == 0) {
-  //   Serial.print("weight: ");
-  //   Serial.print(weight);
-  //   Serial.print(" value: ");
-  //   Serial.print(value, 0);
-  //   Serial.print(" mA: ");
-  //   Serial.print(mA);
-  //   Serial.println();
-  
-  //   c = 0;
-  // }
-  // c++;
-  // delay(100);
+  if (mA_value_ATV > params[Settings::acs_on_atv]) {
+    projector->state->setVal(1);
+    projector->update();
+  }
+  if (mA_value_ATV < params[Settings::acs_off_atv]) {
+    projector->state->setVal(0);
+    projector->update();
+  }
+
 }
