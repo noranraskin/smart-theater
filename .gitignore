@@ -1,4 +1,7 @@
 .build/
+.build-arduino/
 debug_custom.json
 debug.cfg
 esp32.svd
+filesystem.littlefs
+*.eprj

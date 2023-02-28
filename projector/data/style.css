@@ -1,7 +1,7 @@
 h1 {
     text-align: center;
   }
-  form {
+  form, #settings {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -9,7 +9,7 @@ h1 {
     padding: 20px;
     border: 1px solid #333;
     border-radius: 10px;
-    width: 50%;
+    max-width: 800px;
   }
   input[type="submit"] {
     margin: 20px 0;

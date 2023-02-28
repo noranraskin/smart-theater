@@ -35,8 +35,16 @@ void handleSettings(AsyncWebServerRequest *request) {
   url.replace("/settings", "");
   url.replace("/", "");
   if (params.find(url) != params.end()) {
-    request->send(200, "application/json", String(params[url]));
-    return;
+    if (request->method() == WebRequestMethod::HTTP_GET) {
+      request->send(200, "application/json", String(params[url]));
+      return;
+    } else if (request->method() == WebRequestMethod::HTTP_POST) {
+      if (request->hasArg("value")) {
+        params[url] = request->arg("value").toFloat();
+        request->send(200);
+        return;
+      }
+    }
   }
   request->send(400);
 }
