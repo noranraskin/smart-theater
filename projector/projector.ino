@@ -18,6 +18,8 @@ float value  = 0;
 Stepper motor(params[Settings::steps], IN1, IN2, IN3, IN4);
 ACS712  ACS(34, 5.0, 4095, 185);
 AsyncWebServer server(80);
+nvs_handle_t nvs;
+
 
 void handleSettings(AsyncWebServerRequest *request) {
   String url = request->url();
@@ -25,7 +27,7 @@ void handleSettings(AsyncWebServerRequest *request) {
     AsyncResponseStream * response = request->beginResponseStream("application/json");
     DynamicJsonDocument doc(256);
     JsonArray obj = doc.to<JsonArray>();
-    for (const auto&[label, _]: params) {
+    for (const auto& [label, _]: params) {
       obj.add(label);
     }
     serializeJson(doc, *response);
@@ -40,7 +42,7 @@ void handleSettings(AsyncWebServerRequest *request) {
       return;
     } else if (request->method() == WebRequestMethod::HTTP_POST) {
       if (request->hasArg("value")) {
-        params[url] = request->arg("value").toFloat();
+        set(url, request->arg("value").toFloat());
         request->send(200);
         return;
       }
@@ -58,9 +60,13 @@ void setupWeb() {
 
 void setup() {
   Serial.begin(115200);
-  	if (!LittleFS.begin()) {
+  if (!LittleFS.begin()) {
 		WEBLOG("An Error has occurred while mounting FS");
 	}
+  if (!nvs_open("settings", NVS_READWRITE, &nvs)) {
+    WEBLOG("An Error has occurred while opening NVS namespace `settings`");
+  }
+  loadSettings();
   homeSpan.enableOTA();
   homeSpan.enableWebLog(20, "pool.ntp.org", "CET", "logs");
   homeSpan.setHostNameSuffix(""); // use null string for suffix (rather than the HomeSpan device ID)
@@ -78,7 +84,7 @@ void loop() {
   homeSpan.poll();
   // //  select sppropriate function
   // float mA = ACS.mA_AC_sampling();
-  // float weight = params[Settings::weight];
+  // float weight = params[Settings::acs_weight];
   // // float mA = ACS.mA_AC();
   // value += weight * (mA - value);  // low pass filtering
   // if (c % 10 == 0) {
