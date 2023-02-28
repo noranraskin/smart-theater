@@ -73,7 +73,24 @@ void handleSettings(AsyncWebServerRequest *request) {
   request->send(400);
 }
 
+void handleSensor(AsyncWebServerRequest *request) {
+  String url = request->url();
+  url.replace("/sensor", "");
+  url.replace("/", "");
+  if (url == "appleTV") {
+    request->send(200, "application/json", String(mA_value_ATV));
+    return;
+  }
+  if (url == "projector") {
+    request->send(200, "application/json", String(mA_value_PROJECTOR));
+    return;
+  }
+  request->send(400, "text/plain", "Sensor not available");
+  return;
+}
+
 void setupWeb() {
+  server.on("/sensor", handleSensor);
   server.on("/settings", handleSettings);
   server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
   server.begin();
@@ -125,12 +142,16 @@ void setup() {
 void loop() {
   homeSpan.poll();
   if (mA_value_ATV > params[Settings::acs_on_atv]) {
-    projector->state->setVal(1);
-    projector->update();
+    if (projector->state->getVal() != 1) {
+      projector->state->setVal(1);
+      projector->update();
+    }
   }
   if (mA_value_ATV < params[Settings::acs_off_atv]) {
-    projector->state->setVal(0);
-    projector->update();
+    if (projector->state->getVal() != 0) {
+      projector->state->setVal(0);
+      projector->update();
+    }
   }
-
+  Serial.println(mA_value_ATV);
 }

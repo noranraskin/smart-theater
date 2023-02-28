@@ -27,7 +27,7 @@ struct AppleTV:Service::LightSensor {
     int counter = 0;
 
     void loop() {
-        if (currentValue->timeVal() > 100) {
+        if (currentValue->timeVal() > 10) {
             float weight = params[Settings::acs_weight];
             float mA = ACS_ATV.mA_AC();
             mA_value_ATV += weight * (mA - mA_value_ATV);  // low pass filtering
