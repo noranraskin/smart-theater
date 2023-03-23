@@ -10,39 +10,48 @@
 #define STEPPER1 14
 #define STEPPER2 27
 #define STEPPER3 26
-#define STEPPER4 25
+#define STEPPER4 33
 
 // Only use pins from the first ADC channel for ACS sensors, the second is occupied by WIFI
 #define ACS 34
 
 const int LUM_SENSOR = 35;
 const int ON_SWITCH = 32;
+const char * canvas_mac = "08:3A:F2:B7:04:DC";
+SpanPoint * canvas;
 
-// If current reading is more than that it will say projector is on.
-int mASwitch = 2000;
+AccelStepper motor(AccelStepper::FULL4WIRE, STEPPER1, STEPPER2, STEPPER3, STEPPER4);
+ACS712 ACS_PROJECTOR(ACS, 5.0, 4095, 185);
+AsyncWebServer server(80);
+Projector* projector;
+bool ATV_STATE = false;
+
 
 void turnOn() {
-  digitalWrite(ON_SWITCH, HIGH);
-  delay(100);
-  digitalWrite(ON_SWITCH, LOW);
+  if (ACS_PROJECTOR.mA_AC() < params[Settings::thresh_off_atv]) {
+    digitalWrite(ON_SWITCH, HIGH);
+    delay(100);
+    digitalWrite(ON_SWITCH, LOW);
+    bool var = true;
+    canvas->send(&var);
+    motor.move(params[Settings::steps]);
+  }
 }
 
 void turnOff() {
-  turnOn();
-  delay(300);
-  turnOn();
+  if (ACS_PROJECTOR.mA_AC() > params[Settings::thresh_on_atv]) {
+      digitalWrite(ON_SWITCH, HIGH);
+      delay(100);
+      digitalWrite(ON_SWITCH, LOW);
+      delay(300);
+      digitalWrite(ON_SWITCH, HIGH);
+      delay(100);
+      digitalWrite(ON_SWITCH, LOW);
+      bool var = false;
+      canvas->send(&var);
+      motor.move(-params[Settings::steps]);
+  }
 }
-
-float mA_value_ATV  = 0;
-float mA_value_PROJECTOR = 0;
-
-AccelStepper motor(AccelStepper::FULL4WIRE, STEPPER1, STEPPER2, STEPPER3, STEPPER4);
-int motor_position = 0;
-bool motor_stopped = true;
-ACS712 ACS_PROJECTOR(ACS, 5.0, 4095, 185);
-AsyncWebServer server(80);
-
-Projector* projector;
 
 void motor_task(void * pvParameters) {
   while(true) {
@@ -111,7 +120,7 @@ void handleSensor(AsyncWebServerRequest *request) {
     return;
   }
   if (url == "projector") {
-    request->send(200, "application/json", String(mA_value_PROJECTOR));
+    request->send(200, "application/json", String(ACS_PROJECTOR.mA_AC()));
     return;
   }
   request->send(400, "text/plain", "Sensor not available");
@@ -188,6 +197,8 @@ void setup() {
     NULL,   // Task handle
     1   // Core to run the task on (0 or 1)
   );
+  // Init Spanpoint
+  canvas = new SpanPoint(canvas_mac, sizeof(bool), 0);
   // Setup homespan
   homeSpan.enableOTA();
   homeSpan.enableWebLog(20, "pool.ntp.org", "CET", "logs");
@@ -209,10 +220,28 @@ void setup() {
   // Setup ACS sensors
   ACS_PROJECTOR.autoMidPoint();
   ACS_PROJECTOR.suppressNoise(true);
-  mA_value_PROJECTOR = ACS_PROJECTOR.mA_AC();
 }
 
 
 void loop() {
   homeSpan.poll();
+  int ATV_LUM = analogRead(LUM_SENSOR);
+  bool old_state = ATV_STATE;
+  if (ATV_LUM > params[Settings::thresh_on_atv]) {
+    // Apple TV is on
+    ATV_STATE = true;
+  }
+  if (ATV_LUM < params[Settings::thresh_off_atv]) {
+    // Apple TV is off
+    ATV_STATE = false;
+  }
+  if (old_state != ATV_STATE) {
+    Serial.println("Apple TV just turned " + ATV_STATE ? "on" : "off");
+    if (ATV_STATE) {
+      turnOn();
+    } else {
+      turnOff();
+    }
+
+  }
 }

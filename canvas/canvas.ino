@@ -11,6 +11,10 @@
 #define ENDSTOP_DOWN 33
 #define STATUS_LED	25
 
+const char * projector_mac = "C8:C9:A3:C6:B3:68";
+SpanPoint * projector;
+bool projector_state = false;
+
 AsyncWebServer server(80);
 hw_timer_t *timer = NULL;
 
@@ -32,6 +36,7 @@ void move_motor(int updown) {
 }
 
 void move_motor_t(float forSeconds, int speedPercent, int updown) {
+	// When updown is 1 canvas moves up, else down
 	speedPercent = max(speedPercent, 0);
 	speedPercent = min(speedPercent, 100);
 	int speed = map(speedPercent, 0, 100, 65, 255);
@@ -119,6 +124,8 @@ void setup() {
 	if (!LittleFS.begin()) {
 		WEBLOG("An Error has occurred while mounting FS");
 	}
+	// Init Spanpoint
+	projector = new SpanPoint(projector_mac, 0 , sizeof(bool));
 	// Init homespan
 	homeSpan.enableOTA();
 	homeSpan.setStatusPin(STATUS_LED);
@@ -149,4 +156,8 @@ void setup() {
 void loop() {
 	// Poll homespan and webserver
 	homeSpan.poll();
+	if (projector->get(&projector_state)) {
+		move_motor(!projector_state);
+		Serial.println("Moving canvas " + projector_state ? "down" : "up");
+	}
 }
