@@ -45,8 +45,11 @@ AsyncWebServer server(80);
 Projector* projector;
 
 void motor_task(void * pvParameters) {
-  for(;;) {
+  while(true) {
     motor.run();
+    if (motor.distanceToGo() == 0) {
+      motor.disableOutputs();
+    }
     delay(1);
   }
 }
@@ -86,6 +89,19 @@ void handleSettings(AsyncWebServerRequest *request) {
   request->send(400);
 }
 
+void handleSysCommands(AsyncWebServerRequest *request) {
+  if (request->hasArg("command")) {
+		String command = request->arg("command");
+		if (command == "Restart") {
+		  request->send(200, "text/plain", "Restarting...");
+      delay(500);
+      ESP.restart();
+    }
+	} else {
+		request->send(400, "text/plain", "Bad  Request");
+	}
+}
+
 void handleSensor(AsyncWebServerRequest *request) {
   String url = request->url();
   url.replace("/sensor", "");
@@ -110,7 +126,7 @@ void handleProjector(AsyncWebServerRequest *request) {
 		} else if (command == "Off") {
       turnOff();
 		}
-		request->send(200, "text/plain", "Stereo turned " + request->arg("command"));
+		request->send(200, "text/plain", "Projector turned " + request->arg("command"));
 	} else {
 		request->send(400, "text/plain", "Bad  Request");
 	}
@@ -141,6 +157,7 @@ void handleStepper(AsyncWebServerRequest *request) {
 }
 
 void setupWeb() {
+  server.on("/system", handleSysCommands);
   server.on("/sensor", handleSensor);
   server.on("/settings", handleSettings);
   server.on("/projector", handleProjector);

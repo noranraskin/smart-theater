@@ -19,7 +19,7 @@ struct Settings {
 };
 
 const String Settings::acceleration = "Stepper: Acceleration";
-const String Settings::steps = "Stepper: Steps to open/close";
+const String Settings::steps = "Stepper: Steps to open or close";
 const String Settings::speed = "Stepper: Motor Speed";
 const String Settings::thresh_on_atv = "On Threshold Apple TV";
 const String Settings::thresh_off_atv = "Off Threshold Apple TV";
@@ -28,9 +28,9 @@ const String Settings::projector_on_thresh = "On threshold for Projector";
 const String Settings::projector_off_thresh = "Off threshold for Projector";
 
 std::map<String, float> params = {
-  {Settings::acceleration, 5000},
+  {Settings::acceleration, 8000},
   {Settings::steps, 1200},
-  {Settings::speed, 400},
+  {Settings::speed, 800},
   {Settings::thresh_on_atv, 2000},
   {Settings::thresh_off_atv, 100},
   {Settings::hs_update_interval, 30},
