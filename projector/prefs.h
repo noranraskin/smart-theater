@@ -8,28 +8,34 @@ nvs_handle_t nvs;
 const char* setting_ns = "settings";
 
 struct Settings {
+  static const String acceleration;
   static const String steps;
   static const String speed;
-  static const String acs_weight;
-  static const String acs_on_atv;
-  static const String acs_off_atv;
+  static const String thresh_on_atv;
+  static const String thresh_off_atv;
   static const String hs_update_interval;
+  static const String projector_on_thresh;
+  static const String projector_off_thresh;
 };
 
-const String Settings::steps = "Stepper: Steps per Revolution";
+const String Settings::acceleration = "Stepper: Acceleration";
+const String Settings::steps = "Stepper: Steps to open/close";
 const String Settings::speed = "Stepper: Motor Speed";
-const String Settings::acs_weight = "ACS: Low Pass weight";
-const String Settings::acs_on_atv = "ACS: On Threshold Apple TV";
-const String Settings::acs_off_atv = "ACS: Off Threshold Apple TV";
+const String Settings::thresh_on_atv = "On Threshold Apple TV";
+const String Settings::thresh_off_atv = "Off Threshold Apple TV";
 const String Settings::hs_update_interval = "Homespan: ACS Update Interval";
+const String Settings::projector_on_thresh = "On threshold for Projector";
+const String Settings::projector_off_thresh = "Off threshold for Projector";
 
 std::map<String, float> params = {
-  {Settings::steps, 200},
-  {Settings::speed, 120},
-  {Settings::acs_weight, 0.01},
-  {Settings::acs_on_atv, 83},
-  {Settings::acs_off_atv, 76},
+  {Settings::acceleration, 5000},
+  {Settings::steps, 1200},
+  {Settings::speed, 400},
+  {Settings::thresh_on_atv, 2000},
+  {Settings::thresh_off_atv, 100},
   {Settings::hs_update_interval, 30},
+  {Settings::projector_on_thresh, 2000},
+  {Settings::projector_on_thresh, 1000},
 };
 
 String hashString(String str) {
