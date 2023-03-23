@@ -7,6 +7,26 @@
   <body>
     <h1>Projector</h1>
     <div id="settings" class="settings"></div>
-    <script src="script.js"></script>
+    <form id="projector-form" action="/projector" method="post">
+      Projector:<br />
+      <div class="form">
+        <input type="submit" class="submit-btn" name="command" value="On" />
+        <input type="submit" class="submit-btn" name="command" value="Off" />
+      </div>
+    </form>
+    <form id="stepper-form" action="/stepper" method="post">
+      Stepper Motor Steps:
+      <input type="number" min="0" step="any" name="steps" value="400" /><br />
+      Speed (%):
+      <input type="number" min="1" name="speed" value="100" /><br />
+      <div class="form">
+        <input type="submit" class="submit-btn" name="direction" value="Up" />
+        <input type="submit" class="submit-btn" name="direction" value="Down" />
+        <input type="submit" class="submit-btn" name="direction" value="Stop" />
+      </div>
+    </form>
+
+    <script src="settings.js"></script>
+    <script src="forms.js"></script>
   </body>
 </html>

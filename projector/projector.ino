@@ -17,7 +17,6 @@
 
 const int LUM_SENSOR = 35;
 const int ON_SWITCH = 32;
-int counter = 0;
 
 // If current reading is more than that it will say projector is on.
 int mASwitch = 2000;
