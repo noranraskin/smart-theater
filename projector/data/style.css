@@ -1,35 +1,58 @@
 h1 {
-    text-align: center;
+  text-align: center;
+}
+form,
+#settings {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 50px auto;
+  padding: 20px;
+  border: 1px solid #333;
+  border-radius: 10px;
+  max-width: 800px;
+}
+input[type="submit"],
+button {
+  margin: 20px 0;
+  padding: 10px 20px;
+  background-color: #333;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+button {
+  margin: inherit 10px;
+}
+input[type="submit"]:hover,
+button:hover {
+  color: #666;
+  transition: 300ms;
+}
+.success {
+  background-color: lightgreen;
+  color: white;
+  transition: 500ms;
+}
+
+/* Media queries */
+@media only screen and (max-device-width: 600px) {
+  h1 {
+    font-size: 3em;
   }
-  form, #settings {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin: 50px auto;
-    padding: 20px;
-    border: 1px solid #333;
-    border-radius: 10px;
-    max-width: 800px;
+  select {
+    font-size: 2rem;
   }
-  input[type="submit"], button {
-    margin: 20px 0;
-    padding: 10px 20px;
-    background-color: #333;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+  form,
+  #settings {
+    font-size: 3em;
   }
+  input[type="submit"],
   button {
-    margin: inherit 10px;
+    font-size: 1em;
   }
-  input[type="submit"]:hover, button:hover {
-    color: #666;
-    transition: 300ms;
+  input[type="number"] {
+    font-size: 1em;
   }
-  .success {
-    background-color: lightgreen;
-    color: white;
-    transition: 500ms;
-  }
-  
+}
