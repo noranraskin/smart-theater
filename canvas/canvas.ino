@@ -23,6 +23,14 @@ void stop_motor() {
 	analogWrite(MOTOR_DOWN, 0);
 }
 
+void stop_motor_up() {
+	analogWrite(MOTOR_UP, 0);
+}
+
+void stop_motor_down() {
+	analogWrite(MOTOR_DOWN, 0);
+}
+
 boolean isDown() {
 	return digitalRead(ENDSTOP_DOWN) || !digitalRead(HALL);
 }
@@ -39,11 +47,11 @@ void move_motor_t(float forSeconds, int speedPercent, int updown) {
 	// When updown is 1 canvas moves up, else down
 	speedPercent = max(speedPercent, 0);
 	speedPercent = min(speedPercent, 100);
-	int speed = map(speedPercent, 0, 100, 65, 255);
-	if (!digitalRead(ENDSTOP_UP) && updown) {
+	int speed = map(speedPercent, 0, 100, 65, 230);
+	if (updown) {
 		analogWrite(MOTOR_DOWN, 0);
 		analogWrite(MOTOR_UP, speed);
-	} else if (!digitalRead(ENDSTOP_DOWN) && digitalRead(HALL)) {
+	} else if (!updown) {
 		analogWrite(MOTOR_UP, 0);
 		analogWrite(MOTOR_DOWN, speed);
 	} else {
@@ -117,8 +125,8 @@ void setup() {
 	pinMode(HALL, INPUT_PULLUP);
 	timer = timerBegin(0, 80, true);
 	timerAttachInterrupt(timer, stop_motor, true);
-	attachInterrupt(ENDSTOP_UP, stop_motor, RISING);
-	attachInterrupt(ENDSTOP_DOWN, stop_motor, RISING);
+	attachInterrupt(ENDSTOP_UP, stop_motor_up, HIGH);
+	// attachInterrupt(ENDSTOP_DOWN, stop_motor, RISING);
 	attachInterrupt(HALL, stop_motor, FALLING);
 	// Initialize SPIFFS
 	if (!LittleFS.begin()) {
@@ -158,6 +166,6 @@ void loop() {
 	homeSpan.poll();
 	if (projector->get(&projector_state)) {
 		move_motor(!projector_state);
-		Serial.println("Moving canvas " + projector_state ? "down" : "up");
+		Serial.printf("Moving canvas %s\n", (projector_state ? "down" : "up"));
 	}
 }

@@ -15,6 +15,7 @@
 // Only use pins from the first ADC channel for ACS sensors, the second is occupied by WIFI
 #define ACS 34
 
+const int ENDSTOP = 13;
 const int LUM_SENSOR = 35;
 const int ON_SWITCH = 32;
 const char * canvas_mac = "08:3A:F2:B7:04:DC";
@@ -26,20 +27,24 @@ AsyncWebServer server(80);
 Projector* projector;
 bool ATV_STATE = false;
 
-
-void turnOn() {
-  if (ACS_PROJECTOR.mA_AC() < params[Settings::thresh_off_atv]) {
-    digitalWrite(ON_SWITCH, HIGH);
-    delay(100);
-    digitalWrite(ON_SWITCH, LOW);
-    bool var = true;
+void send_canvas_cmd(bool var) {
+  if (params[Settings::spanpoint_en]) {
     canvas->send(&var);
-    motor.move(params[Settings::steps]);
   }
 }
 
+void turnOn() {
+  // if (((int) ACS_PROJECTOR.mA_AC()) < params[Settings::thresh_off_atv]) {
+    digitalWrite(ON_SWITCH, HIGH);
+    delay(100);
+    digitalWrite(ON_SWITCH, LOW);
+    send_canvas_cmd(true);
+    motor.moveTo(params[Settings::steps]);
+  // }
+}
+
 void turnOff() {
-  if (ACS_PROJECTOR.mA_AC() > params[Settings::thresh_on_atv]) {
+  // if (((int) ACS_PROJECTOR.mA_AC()) > params[Settings::thresh_on_atv]) {
       digitalWrite(ON_SWITCH, HIGH);
       delay(100);
       digitalWrite(ON_SWITCH, LOW);
@@ -47,10 +52,9 @@ void turnOff() {
       digitalWrite(ON_SWITCH, HIGH);
       delay(100);
       digitalWrite(ON_SWITCH, LOW);
-      bool var = false;
-      canvas->send(&var);
-      motor.move(-params[Settings::steps]);
-  }
+      send_canvas_cmd(false);
+      motor.moveTo(0);
+  // }
 }
 
 void motor_task(void * pvParameters) {
@@ -84,7 +88,7 @@ void handleSettings(AsyncWebServerRequest *request) {
       return;
     } else if (request->method() == WebRequestMethod::HTTP_POST) {
       if (request->hasArg("value")) {
-        float val = request->arg("value").toFloat();
+        int val = request->arg("value").toInt();
         Serial.printf("Update request with %s and %f\n", url.c_str(), val);
         updateSetting(url, val);
         if (url == Settings::acceleration) {
@@ -108,6 +112,21 @@ void handleSysCommands(AsyncWebServerRequest *request) {
     }
 	} else {
 		request->send(400, "text/plain", "Bad  Request");
+	}
+}
+
+void handleSpanPoint(AsyncWebServerRequest *request) {
+  if (request->hasArg("direction")) {
+		if (request->arg("direction") == "Down") {
+      bool var = true;
+      canvas->send(&var);
+		} else if (request->arg("direction") == "Up") {
+      bool var = false;
+      canvas->send(&var);
+		} 
+		request->send(200, "text/plain", "Motor moved");
+	} else {
+		request->send(400, "text/plain", "Bad Request");
 	}
 }
 
@@ -170,6 +189,7 @@ void setupWeb() {
   server.on("/sensor", handleSensor);
   server.on("/settings", handleSettings);
   server.on("/projector", handleProjector);
+  server.on("/canvas", handleSpanPoint);
   server.on("/stepper", handleStepper);
   server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
   server.begin();
@@ -183,11 +203,16 @@ void setup() {
 	}
   loadSettings();
   // Setup pins
+  pinMode(ENDSTOP, INPUT);
   pinMode(ON_SWITCH, OUTPUT);
   pinMode(LUM_SENSOR, INPUT);
   motor.setMaxSpeed(params[Settings::speed]);
   motor.setAcceleration(params[Settings::acceleration]);
   motor.setCurrentPosition(0);
+  attachInterrupt(ENDSTOP, []{
+    motor.stop();
+    motor.setCurrentPosition(0);
+  }, RISING);
   xTaskCreatePinnedToCore(
     motor_task,   // Task function
     "StepperTask",   // Task name
@@ -236,7 +261,7 @@ void loop() {
     ATV_STATE = false;
   }
   if (old_state != ATV_STATE) {
-    Serial.println("Apple TV just turned " + ATV_STATE ? "on" : "off");
+    Serial.printf("Apple TV just turned %s\n", (ATV_STATE ? "on" : "off"));
     if (ATV_STATE) {
       turnOn();
     } else {

@@ -13,29 +13,29 @@ struct Settings {
   static const String speed;
   static const String thresh_on_atv;
   static const String thresh_off_atv;
-  static const String hs_update_interval;
   static const String projector_on_thresh;
   static const String projector_off_thresh;
+  static const String spanpoint_en;
 };
 
-const String Settings::acceleration = "Stepper: Acceleration";
-const String Settings::steps = "Stepper: Steps to open or close";
-const String Settings::speed = "Stepper: Motor Speed";
-const String Settings::thresh_on_atv = "On Threshold Apple TV";
-const String Settings::thresh_off_atv = "Off Threshold Apple TV";
-const String Settings::hs_update_interval = "Homespan: ACS Update Interval";
+const String Settings::acceleration = "Stepper acceleration";
+const String Settings::steps = "Stepper steps to open or close";
+const String Settings::speed = "Stepper motor speed";
+const String Settings::thresh_on_atv = "On threshold for Apple TV";
+const String Settings::thresh_off_atv = "Off threshold for Apple TV";
 const String Settings::projector_on_thresh = "On threshold for Projector";
 const String Settings::projector_off_thresh = "Off threshold for Projector";
+const String Settings::spanpoint_en = "SpanPoint enable";
 
-std::map<String, float> params = {
+std::map<String, int> params = {
   {Settings::acceleration, 8000},
-  {Settings::steps, 1200},
-  {Settings::speed, 800},
+  {Settings::steps, 4400},
+  {Settings::speed, 600},
   {Settings::thresh_on_atv, 2000},
   {Settings::thresh_off_atv, 100},
-  {Settings::hs_update_interval, 30},
   {Settings::projector_on_thresh, 2000},
   {Settings::projector_on_thresh, 1000},
+  {Settings::spanpoint_en, 1},
 };
 
 String hashString(String str) {
@@ -51,7 +51,7 @@ int openNS() {
   return err;
 }
 
-void updateSetting(String key, float val) {
+void updateSetting(String key, int val) {
   if (params.find(key) == params.end()) {
     Serial.println("Couldn't find parameter...");
     return;
@@ -61,7 +61,7 @@ void updateSetting(String key, float val) {
     return;
   }
   esp_err_t err;
-  if (err = nvs_set_blob(nvs, hashString(key).c_str(), &val, sizeof(float)); err != ESP_OK) {
+  if (err = nvs_set_blob(nvs, hashString(key).c_str(), &val, sizeof(int)); err != ESP_OK) {
     Serial.printf("Error occurred while writing to NVS %d\n", err);
     nvs_close(nvs);
     return;
@@ -79,8 +79,8 @@ void loadSettings() {
   if (openNS() != ESP_OK) {
     return;
   }
-  float value = 0;
-  size_t size = sizeof(float);
+  int value = 0;
+  size_t size = sizeof(int);
   Serial.println("Loading settings");
   for (auto const& item: params) {
     esp_err_t err = nvs_get_blob(nvs, hashString(item.first).c_str(), &value, &size);
