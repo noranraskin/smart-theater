@@ -6,7 +6,6 @@
 #include "AsyncJson.h"
 #include "HomeSpan.h"
 #include "homespan_devices.h"
-
 #define STEPPER1 14
 #define STEPPER2 27
 #define STEPPER3 26
@@ -25,7 +24,10 @@ AccelStepper motor(AccelStepper::FULL4WIRE, STEPPER1, STEPPER2, STEPPER3, STEPPE
 ACS712 ACS_PROJECTOR(ACS, 5.0, 4095, 185);
 AsyncWebServer server(80);
 Projector* projector;
-bool ATV_STATE = false;
+bool atv_state = false;
+unsigned long last_atv_check_time = 0;
+bool atv_action = false;
+bool desired_projector_state = false;
 
 void send_canvas_cmd(bool var) {
   if (params[Settings::spanpoint_en]) {
@@ -241,7 +243,6 @@ void setup() {
   new Characteristic::Identify();
   new Characteristic::Name("Projector");
   projector = new Projector();
-
   // Setup ACS sensors
   ACS_PROJECTOR.autoMidPoint();
   ACS_PROJECTOR.suppressNoise(true);
@@ -251,22 +252,27 @@ void setup() {
 void loop() {
   homeSpan.poll();
   int ATV_LUM = analogRead(LUM_SENSOR);
-  bool old_state = ATV_STATE;
+  bool old_state = atv_state;
   if (ATV_LUM > params[Settings::thresh_on_atv]) {
     // Apple TV is on
-    ATV_STATE = true;
+    atv_state = true;
   }
   if (ATV_LUM < params[Settings::thresh_off_atv]) {
     // Apple TV is off
-    ATV_STATE = false;
+    atv_state = false;
   }
-  if (old_state != ATV_STATE) {
-    Serial.printf("Apple TV just turned %s\n", (ATV_STATE ? "on" : "off"));
-    if (ATV_STATE) {
-      turnOn();
-    } else {
-      turnOff();
+  if (old_state != atv_state) {
+    last_atv_check_time = millis();
+    atv_action = true;
+  }
+  if (atv_action && millis() - last_atv_check_time > params[Settings::timeout_atv]) {
+    Serial.printf("Apple TV just turned %s\n", (atv_state ? "on" : "off"));
+    if (params[Settings::atv_led_en]) {
+      if (atv_state) {
+        turnOn();
+      } else {
+        turnOff();
+      }
     }
-
   }
 }
