@@ -1,3 +1,5 @@
+#ifndef PREFS_H
+#define PREFS_H
 #include <map>
 #include <nvs.h>
 #include <nvs_flash.h>
@@ -43,7 +45,7 @@ std::map<String, int> params = {
   {Settings::projector_on_thresh, 1000},
   {Settings::spanpoint_en, 1},
   {Settings::timeout_atv, 1000},
-  {Settings::timeout_projector, 2500},
+  {Settings::timeout_projector, 1000},
   {Settings::atv_led_en, 1}
 };
 
@@ -104,3 +106,5 @@ void loadSettings() {
   }
   nvs_close(nvs);
 }
+
+#endif

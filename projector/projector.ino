@@ -1,11 +1,11 @@
-#include <AccelStepper.h>
+// #include <AccelStepper.h>
 #include "ACS712.h"
 #include "prefs.h"
 #include "ESPAsyncWebSrv.h"
 #include "LittleFS.h"
-#include "AsyncJson.h"
 #include "HomeSpan.h"
 #include "homespan_devices.h"
+#include "webserver.h"
 #define STEPPER1 14
 #define STEPPER2 27
 #define STEPPER3 26
@@ -28,35 +28,35 @@ bool atv_state = false;
 unsigned long last_atv_check_time = 0;
 bool atv_action = false;
 bool desired_projector_state = false;
+unsigned long last_projector_check_time = 0;
 
 void send_canvas_cmd(bool var) {
   if (params[Settings::spanpoint_en]) {
     canvas->send(&var);
   }
 }
-
-void turnOn() {
-  // if (((int) ACS_PROJECTOR.mA_AC()) < params[Settings::thresh_off_atv]) {
+void turnProjectorOn(bool var) {
+  if (var) {
     digitalWrite(ON_SWITCH, HIGH);
     delay(100);
     digitalWrite(ON_SWITCH, LOW);
+  } else {
+    turnProjectorOn(true);
+    delay(300);
+    turnProjectorOn(true);
+  }
+}
+
+void turnOn() {
+    desired_projector_state = true;
     send_canvas_cmd(true);
     motor.moveTo(params[Settings::steps]);
-  // }
 }
 
 void turnOff() {
-  // if (((int) ACS_PROJECTOR.mA_AC()) > params[Settings::thresh_on_atv]) {
-      digitalWrite(ON_SWITCH, HIGH);
-      delay(100);
-      digitalWrite(ON_SWITCH, LOW);
-      delay(300);
-      digitalWrite(ON_SWITCH, HIGH);
-      delay(100);
-      digitalWrite(ON_SWITCH, LOW);
-      send_canvas_cmd(false);
-      motor.moveTo(0);
-  // }
+    desired_projector_state = false;
+    send_canvas_cmd(false);
+    motor.moveTo(0);
 }
 
 void motor_task(void * pvParameters) {
@@ -69,122 +69,6 @@ void motor_task(void * pvParameters) {
   }
 }
 
-void handleSettings(AsyncWebServerRequest *request) {
-  String url = request->url();
-  if (url == "/settings") {
-    AsyncResponseStream * response = request->beginResponseStream("application/json");
-    DynamicJsonDocument doc(256);
-    JsonArray obj = doc.to<JsonArray>();
-    for (auto const& item: params) {
-      obj.add(item.first);
-    }
-    serializeJson(doc, *response);
-    request->send(response);
-    return;
-  }
-  url.replace("/settings", "");
-  url.replace("/", "");
-  if (params.find(url) != params.end()) {
-    if (request->method() == WebRequestMethod::HTTP_GET) {
-      request->send(200, "application/json", String(params[url]));
-      return;
-    } else if (request->method() == WebRequestMethod::HTTP_POST) {
-      if (request->hasArg("value")) {
-        int val = request->arg("value").toInt();
-        Serial.printf("Update request with %s and %f\n", url.c_str(), val);
-        updateSetting(url, val);
-        if (url == Settings::acceleration) {
-          motor.setAcceleration(val);
-        }
-        request->send(200);
-        return;
-      }
-    }
-  }
-  request->send(400);
-}
-
-void handleSysCommands(AsyncWebServerRequest *request) {
-  if (request->hasArg("command")) {
-		String command = request->arg("command");
-		if (command == "Restart") {
-		  request->send(200, "text/plain", "Restarting...");
-      delay(500);
-      ESP.restart();
-    }
-	} else {
-		request->send(400, "text/plain", "Bad  Request");
-	}
-}
-
-void handleSpanPoint(AsyncWebServerRequest *request) {
-  if (request->hasArg("direction")) {
-		if (request->arg("direction") == "Down") {
-      bool var = true;
-      canvas->send(&var);
-		} else if (request->arg("direction") == "Up") {
-      bool var = false;
-      canvas->send(&var);
-		} 
-		request->send(200, "text/plain", "Motor moved");
-	} else {
-		request->send(400, "text/plain", "Bad Request");
-	}
-}
-
-void handleSensor(AsyncWebServerRequest *request) {
-  String url = request->url();
-  url.replace("/sensor", "");
-  url.replace("/", "");
-  if (url == "appleTV") {
-    request->send(200, "application/json", String(analogRead(LUM_SENSOR)));
-    return;
-  }
-  if (url == "projector") {
-    request->send(200, "application/json", String(ACS_PROJECTOR.mA_AC()));
-    return;
-  }
-  request->send(400, "text/plain", "Sensor not available");
-  return;
-}
-
-void handleProjector(AsyncWebServerRequest *request) {
-	if (request->hasArg("command")) {
-		String command = request->arg("command");
-		if (command == "On") {
-			turnOn();
-		} else if (command == "Off") {
-      turnOff();
-		}
-		request->send(200, "text/plain", "Projector turned " + request->arg("command"));
-	} else {
-		request->send(400, "text/plain", "Bad  Request");
-	}
-}
-
-void handleStepper(AsyncWebServerRequest *request) {
-	if (request->hasArg("steps") && request->hasArg("speed")) {
-		if (request->hasArg("direction") && request->arg("direction") == "Stop") {
-			motor.stop();
-      motor.disableOutputs();
-		}
-		long steps = request->arg("steps").toInt();
-		long speed = request->arg("speed").toInt();
-		motor.setMaxSpeed(params[Settings::speed] * speed / 100);
-		if (request->hasArg("direction") && request->arg("direction") == "Up") {
-      motor.enableOutputs();
-      motor.move(steps);
-		} else if (request->hasArg("direction") && request->arg("direction") == "Down") {
-      motor.enableOutputs();
-      motor.move(-steps);
-		} else {
-			motor.stop();
-		}
-		request->send(200, "text/plain", "Motor moved");
-	} else {
-		request->send(400, "text/plain", "Bad Request");
-	}
-}
 
 void setupWeb() {
   server.on("/system", handleSysCommands);
@@ -274,5 +158,21 @@ void loop() {
         turnOff();
       }
     }
+  }
+  bool actual_projector_state = desired_projector_state;
+  int projector_mA = ACS_PROJECTOR.mA_AC();
+  if (projector_mA > params[Settings::projector_on_thresh]) {
+    // Projector is on
+    actual_projector_state = true;
+  }
+  if (projector_mA < params[Settings::projector_off_thresh]) {
+    // Projector is off
+    actual_projector_state = false;
+  }
+  if (desired_projector_state == actual_projector_state) {
+    last_projector_check_time = millis();
+  }
+  if (millis() - last_projector_check_time > params[Settings::timeout_projector]) {
+    turnProjectorOn(desired_projector_state);
   }
 }
