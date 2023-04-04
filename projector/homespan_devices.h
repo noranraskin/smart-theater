@@ -6,7 +6,7 @@ void turnOn();
 void turnOff();
 
 struct Projector : Service::LightBulb {
-    SpanCharacteristic *state = new Characteristic::Active(0);
+    SpanCharacteristic *state = new Characteristic::On(0);
 
     Projector() : Service::LightBulb() {
 

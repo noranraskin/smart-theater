@@ -30,11 +30,16 @@ bool atv_action = false;
 bool desired_projector_state = false;
 unsigned long last_projector_check_time = 0;
 
-void send_canvas_cmd(bool var) {
+void send_canvas_cmd2(bool var) {
   if (params[Settings::spanpoint_en]) {
-    canvas->send(&var);
+    send_canvas_cmd(var);
   }
 }
+
+void send_canvas_cmd(bool var) {
+  canvas->send(&var);
+}
+
 void turnProjectorOn(bool var) {
   if (var) {
     digitalWrite(ON_SWITCH, HIGH);
@@ -49,13 +54,13 @@ void turnProjectorOn(bool var) {
 
 void turnOn() {
     desired_projector_state = true;
-    send_canvas_cmd(true);
+    send_canvas_cmd2(true);
     motor.moveTo(params[Settings::steps]);
 }
 
 void turnOff() {
     desired_projector_state = false;
-    send_canvas_cmd(false);
+    send_canvas_cmd2(false);
     motor.moveTo(0);
 }
 
@@ -83,6 +88,7 @@ void setupWeb() {
 
 
 void setup() {
+  esp_log_level_set("*", ESP_LOG_VERBOSE);
   Serial.begin(115200);
   if (!LittleFS.begin()) {
 		WEBLOG("An Error has occurred while mounting FS");
@@ -109,7 +115,7 @@ void setup() {
     1   // Core to run the task on (0 or 1)
   );
   // Init Spanpoint
-  canvas = new SpanPoint(canvas_mac, sizeof(bool), 0);
+  // canvas = new SpanPoint(canvas_mac, sizeof(bool), 0);
   // Setup homespan
   homeSpan.enableOTA();
   homeSpan.enableWebLog(20, "pool.ntp.org", "CET", "logs");

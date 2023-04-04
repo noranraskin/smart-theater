@@ -7,7 +7,7 @@
 
 extern const int LUM_SENSOR;
 extern AccelStepper motor;
-extern SpanPoint * canvas;
+void send_canvas_cmd(bool);
 void turnOn();
 void turnOff();
 
@@ -15,7 +15,7 @@ void handleSettings(AsyncWebServerRequest *request) {
   String url = request->url();
   if (url == "/settings") {
     AsyncResponseStream * response = request->beginResponseStream("application/json");
-    DynamicJsonDocument doc(256);
+    DynamicJsonDocument doc(2048);
     JsonArray obj = doc.to<JsonArray>();
     for (auto const& item: params) {
       obj.add(item.first);
@@ -62,11 +62,9 @@ void handleSysCommands(AsyncWebServerRequest *request) {
 void handleSpanPoint(AsyncWebServerRequest *request) {
   if (request->hasArg("direction")) {
 		if (request->arg("direction") == "Down") {
-      bool var = true;
-      canvas->send(&var);
+      send_canvas_cmd(true);
 		} else if (request->arg("direction") == "Up") {
-      bool var = false;
-      canvas->send(&var);
+      send_canvas_cmd(false);
 		} 
 		request->send(200, "text/plain", "Motor moved");
 	} else {
