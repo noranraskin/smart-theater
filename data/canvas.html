@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>ESP Stereo/Canvas</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <h1>Smart Stereo and Canvas</h1>
+    <form id="stereo-form" action="/stereo" method="post">
+      Stereo:<br />
+      <div class="form">
+        <input type="submit" class="submit-btn" name="command" value="On" />
+        <input type="submit" class="submit-btn" name="command" value="Off" />
+      </div>
+    </form>
+    <form id="canvas-form" action="/canvas" method="post">
+      Duration (s):
+      <input type="number" min="0" step="any" name="duration" value="1" /><br />
+      Speed (%):
+      <input type="number" min="1" max="100" name="speed" value="100" /><br />
+      <div class="form">
+        <input type="submit" class="submit-btn" name="direction" value="Up" />
+        <input type="submit" class="submit-btn" name="direction" value="Down" />
+        <input type="submit" class="submit-btn" name="direction" value="Stop" />
+      </div>
+    </form>
+    <form id="system-functions" action="/system" method="post">
+      System
+      <div class="form">
+        <input type="submit" class="submit-btn" name="command" value="Restart">
+      </div>
+    </form>
+    <script src="forms.js"></script>
+  </body>
+</html>

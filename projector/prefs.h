@@ -20,6 +20,7 @@ struct Settings {
   static const String spanpoint_en;
   static const String timeout_atv;
   static const String timeout_projector;
+  static const String projector_action_timeout;
   static const String atv_led_en;
 };
 
@@ -33,19 +34,21 @@ const String Settings::projector_off_thresh = "Off threshold for Projector";
 const String Settings::spanpoint_en = "SpanPoint enable";
 const String Settings::timeout_atv = "Apple TV LED timeout (millis)";
 const String Settings::timeout_projector = "Projector sensor timeout (millis)";
+const String Settings::projector_action_timeout = "Projector action timeout (millis)";
 const String Settings::atv_led_en = "Apple TV LED enable";
 
 std::map<String, int> params = {
   {Settings::acceleration, 8000},
-  {Settings::steps, 4600},
+  {Settings::steps, 4400},
   {Settings::speed, 400},
   {Settings::thresh_on_atv, 1000},
-  {Settings::thresh_off_atv, 20},
+  {Settings::thresh_off_atv, 10},
   {Settings::projector_on_thresh, 2000},
-  {Settings::projector_on_thresh, 1000},
+  {Settings::projector_off_thresh, 1000},
   {Settings::spanpoint_en, 1},
   {Settings::timeout_atv, 1000},
   {Settings::timeout_projector, 1000},
+  {Settings::projector_action_timeout, 8000},
   {Settings::atv_led_en, 1}
 };
 

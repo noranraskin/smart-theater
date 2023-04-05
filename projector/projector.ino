@@ -2,6 +2,7 @@
 #include "ACS712.h"
 #include "prefs.h"
 #include "ESPAsyncWebSrv.h"
+#include "HTTPClient.h"
 #include "LittleFS.h"
 #include "HomeSpan.h"
 #include "homespan_devices.h"
@@ -29,15 +30,37 @@ unsigned long last_atv_check_time = 0;
 bool atv_action = false;
 bool desired_projector_state = false;
 unsigned long last_projector_check_time = 0;
+unsigned long last_action_time = 0;
 
-void send_canvas_cmd2(bool var) {
-  if (params[Settings::spanpoint_en]) {
-    send_canvas_cmd(var);
+void send_post_request_to_canvas(bool var) {
+  HTTPClient http;
+  http.begin("http://10.10.20.157/canvas");
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  String postData;
+  if (var) {
+    postData = "duration=0&speed=100&direction=Down";
+  } else {
+    postData = "duration=0&speed=100&direction=Up";
   }
+  int httpResponseCode = http.POST(postData);
+  http.end();
 }
 
 void send_canvas_cmd(bool var) {
-  canvas->send(&var);
+  Serial.println("Sending canvas cmd");
+  if (canvas) {
+    canvas->send(&var);
+  } else {
+    send_post_request_to_canvas(var);
+  }
+}
+
+void send_canvas_cmd2(bool var) {
+  Serial.println("Sending canvas cmd2");
+  if (params[Settings::spanpoint_en] == 1) {
+    send_canvas_cmd(var);
+  }
 }
 
 void turnProjectorOn(bool var) {
@@ -46,19 +69,25 @@ void turnProjectorOn(bool var) {
     delay(100);
     digitalWrite(ON_SWITCH, LOW);
   } else {
-    turnProjectorOn(true);
+    digitalWrite(ON_SWITCH, HIGH);
+    delay(100);
+    digitalWrite(ON_SWITCH, LOW);
     delay(300);
-    turnProjectorOn(true);
+    digitalWrite(ON_SWITCH, HIGH);
+    delay(100);
+    digitalWrite(ON_SWITCH, LOW);
   }
 }
 
 void turnOn() {
+    Serial.println("Turning on");
     desired_projector_state = true;
     send_canvas_cmd2(true);
     motor.moveTo(params[Settings::steps]);
 }
 
 void turnOff() {
+    Serial.println("Turning off");
     desired_projector_state = false;
     send_canvas_cmd2(false);
     motor.moveTo(0);
@@ -82,7 +111,7 @@ void setupWeb() {
   server.on("/projector", handleProjector);
   server.on("/canvas", handleSpanPoint);
   server.on("/stepper", handleStepper);
-  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+  server.serveStatic("/", LittleFS, "/").setDefaultFile("projector.html");
   server.begin();
 }
 
@@ -115,7 +144,7 @@ void setup() {
     1   // Core to run the task on (0 or 1)
   );
   // Init Spanpoint
-  // canvas = new SpanPoint(canvas_mac, sizeof(bool), 0);
+  // canvas = new SpanPoint(canvas_mac, 1, 0);
   // Setup homespan
   homeSpan.enableOTA();
   homeSpan.enableWebLog(20, "pool.ntp.org", "CET", "logs");
@@ -124,15 +153,15 @@ void setup() {
 	homeSpan.setWifiCallback(setupWeb);
 	homeSpan.begin(Category::Bridges, "HomeSpan Projector");
 
-  new SpanAccessory();
-  new Service::AccessoryInformation();
-  new Characteristic::Identify();
+  // new SpanAccessory();
+  // new Service::AccessoryInformation();
+  // new Characteristic::Identify();
 
-  new SpanAccessory();
-  new Service::AccessoryInformation();
-  new Characteristic::Identify();
-  new Characteristic::Name("Projector");
-  projector = new Projector();
+  // new SpanAccessory();
+  // new Service::AccessoryInformation();
+  // new Characteristic::Identify();
+  // new Characteristic::Name("Projector");
+  // projector = new Projector();
   // Setup ACS sensors
   ACS_PROJECTOR.autoMidPoint();
   ACS_PROJECTOR.suppressNoise(true);
@@ -155,9 +184,10 @@ void loop() {
     last_atv_check_time = millis();
     atv_action = true;
   }
-  if (atv_action && millis() - last_atv_check_time > params[Settings::timeout_atv]) {
+  if (atv_action && (millis() - last_atv_check_time) > params[Settings::timeout_atv]) {
     Serial.printf("Apple TV just turned %s\n", (atv_state ? "on" : "off"));
-    if (params[Settings::atv_led_en]) {
+    if (params[Settings::atv_led_en] == 1) {
+      atv_action = false;
       if (atv_state) {
         turnOn();
       } else {
@@ -166,7 +196,7 @@ void loop() {
     }
   }
   bool actual_projector_state = desired_projector_state;
-  int projector_mA = ACS_PROJECTOR.mA_AC();
+  int projector_mA = (int) ACS_PROJECTOR.mA_AC();
   if (projector_mA > params[Settings::projector_on_thresh]) {
     // Projector is on
     actual_projector_state = true;
@@ -178,7 +208,11 @@ void loop() {
   if (desired_projector_state == actual_projector_state) {
     last_projector_check_time = millis();
   }
-  if (millis() - last_projector_check_time > params[Settings::timeout_projector]) {
-    turnProjectorOn(desired_projector_state);
+  if ((millis() - last_projector_check_time) > params[Settings::timeout_projector]) {
+    if ((millis() - last_action_time) > params[Settings::projector_action_timeout]) {
+      last_action_time = millis();
+      Serial.printf("Turning projector %s\n", (desired_projector_state ? "on" : "off"));
+      turnProjectorOn(desired_projector_state);
+    }
   }
 }

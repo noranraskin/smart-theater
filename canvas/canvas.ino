@@ -65,15 +65,6 @@ void move_motor_t(float forSeconds, int speedPercent, int updown) {
 	}
 }
 
-void handleRoot(AsyncWebServerRequest *request) {
-	File website = LittleFS.open("/index.html");
-	if (website) {
-		request->send(200, "text/html", website.readString());
-		return;
-	}
-	request->send(404, "text/html", "404 Not found");
-}
-
 void handleStereo(AsyncWebServerRequest *request) {
 	if (request->hasArg("command")) {
 		String command = request->arg("command");
@@ -90,12 +81,12 @@ void handleStereo(AsyncWebServerRequest *request) {
 
 void handleCanvas(AsyncWebServerRequest *request) {
 	if (request->hasArg("duration") && request->hasArg("speed")) {
-		if (request->hasArg("direction") && request->arg("direction") == "Stop") {
+		if (request->arg("direction") == "Stop") {
 			stop_motor();
 		}
 		float duration = request->arg("duration").toFloat();
 		int speed = request->arg("speed").toInt();
-		if (request->hasArg("direction") && request->arg("direction") == "Up") {
+		if (request->arg("direction") == "Up") {
 			move_motor_t(duration, speed, 1);
 		} else if (request->hasArg("direction") && request->arg("direction") == "Down") {
 			move_motor_t(duration, speed, 0);
@@ -108,10 +99,25 @@ void handleCanvas(AsyncWebServerRequest *request) {
 	}
 }
 
+void handleSysCommands(AsyncWebServerRequest *request) {
+  if (request->hasArg("command")) {
+		String command = request->arg("command");
+		if (command == "Restart") {
+		  request->send(200, "text/plain", "Restarting...");
+      delay(500);
+      ESP.restart();
+    }
+	} else {
+		request->send(400, "text/plain", "Bad  Request");
+	}
+}
+
+
 void setupWeb() {
 	server.on("/stereo", handleStereo);
 	server.on("/canvas", handleCanvas);
-	server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+	server.on("/system", handleSysCommands);
+	server.serveStatic("/", LittleFS, "/").setDefaultFile("canvas.html");
 	server.begin();
 }
 
