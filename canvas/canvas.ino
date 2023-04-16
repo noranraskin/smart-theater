@@ -14,9 +14,11 @@
 const char * projector_mac = "C8:C9:A3:C6:B3:68";
 SpanPoint * projector;
 bool projector_state = false;
+bool canvas_endstop_trigger = false;
 
 AsyncWebServer server(80);
 hw_timer_t *timer = NULL;
+hw_timer_t *endstop_del_enable = NULL;
 
 void stop_motor() {
 	analogWrite(MOTOR_UP, 0);
@@ -24,15 +26,21 @@ void stop_motor() {
 }
 
 void stop_motor_up() {
-	analogWrite(MOTOR_UP, 0);
+	if (!canvas_endstop_trigger) {
+		analogWrite(MOTOR_UP, 0);
+		canvas_endstop_trigger = true;
+	}
 }
 
 void stop_motor_down() {
-	analogWrite(MOTOR_DOWN, 0);
+	if (!canvas_endstop_trigger) {
+		analogWrite(MOTOR_DOWN, 0);
+		canvas_endstop_trigger = true;
+	}
 }
 
 boolean isDown() {
-	return digitalRead(ENDSTOP_DOWN) || !digitalRead(HALL);
+	return digitalRead(ENDSTOP_DOWN);
 }
 
 boolean isUP() {
@@ -48,17 +56,22 @@ void move_motor_t(float forSeconds, int speedPercent, int updown) {
 	speedPercent = max(speedPercent, 0);
 	speedPercent = min(speedPercent, 100);
 	int speed = map(speedPercent, 0, 100, 65, 230);
-	if (updown) {
+	if (updown && !isUP()) {
 		analogWrite(MOTOR_DOWN, 0);
 		analogWrite(MOTOR_UP, speed);
-	} else if (!updown) {
+	} else if (!updown && !isDown()) {
 		analogWrite(MOTOR_UP, 0);
 		analogWrite(MOTOR_DOWN, speed);
 	} else {
 		return;
 	}
+	timerAlarmDisable(endstop_del_enable);
+	timerWrite(endstop_del_enable, 0);
+	timerAlarmWrite(endstop_del_enable, 1000000, false);
+	timerAlarmEnable(endstop_del_enable);
 	int uSeconds = (int)(forSeconds * 500000);
 	if (uSeconds > 0) {
+		timerAlarmDisable(timer);
 		timerWrite(timer, 0);
 		timerAlarmWrite(timer, uSeconds, false);
 		timerAlarmEnable(timer);
@@ -130,10 +143,14 @@ void setup() {
 	pinMode(ENDSTOP_DOWN, INPUT_PULLDOWN);
 	pinMode(HALL, INPUT_PULLUP);
 	timer = timerBegin(0, 80, true);
+	endstop_del_enable = timerBegin(1, 80, true);
 	timerAttachInterrupt(timer, stop_motor, true);
+	timerAttachInterrupt(endstop_del_enable, []() {
+		canvas_endstop_trigger = false;
+	}, true);
 	attachInterrupt(ENDSTOP_UP, stop_motor_up, HIGH);
-	// attachInterrupt(ENDSTOP_DOWN, stop_motor, RISING);
-	attachInterrupt(HALL, stop_motor, FALLING);
+	attachInterrupt(ENDSTOP_DOWN, stop_motor_down, HIGH);
+	attachInterrupt(HALL, stop_motor_down, FALLING);
 	// Initialize SPIFFS
 	if (!LittleFS.begin()) {
 		WEBLOG("An Error has occurred while mounting FS");
